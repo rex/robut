@@ -36,47 +36,86 @@ bug it exists to fix).
 
 | # | Phase | Status | Exit criteria |
 |---|---|---|---|
-| 1 | <phase name> | ⏸ pending | <what's true when this phase is done> |
-| 2 | <phase name> | ⏸ pending | <...> |
+| 0 | Scaffold + privacy gate | ✅ done | Repo bootstrapped; privacy gate blocking on every commit |
+| 1 | Core app + Codex | ✅ done | Builds, launches to menubar, real Codex usage + pace verdict |
+| 2 | Claude provider | ⏸ pending | Claude session + weekly windows shown, with zero keychain prompts |
+| 3 | Distribution | ⏸ pending | Signed, notarized, Sparkle auto-update, published to Releases |
+| 4 | CI | ⏸ pending | `macos-latest` workflow running build + test + lint + privacy |
 
 Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 2. Slices (vertical, atomic, independently mergeable)
 
-### Slice 1.1 — <imperative title>
+### Slice 2.1 — Claude usage via Robut's own OAuth
+
+- Status: ⏸ pending — **the next thing to build**
+- Depends on: (none)
+- Files (planned): `Robut/Core/Auth/RobutKeychain.swift`,
+  `Robut/Core/Auth/ClaudeOAuth.swift`, `Robut/Core/Providers/ClaudeUsageSource.swift`
+- Files (do NOT edit): `Robut/Core/Pace/**` (frozen — engine is done and tested)
+- Context: endpoint is `https://api.anthropic.com/api/oauth/usage`, called
+  with an OAuth access token. PKCE flow, `ASWebAuthenticationSession`.
+- Acceptance:
+  - [ ] Token is stored in a keychain item **Robut itself creates**, so macOS
+        never prompts. Robut must NEVER read `Claude Code-credentials`.
+  - [ ] Refresh happens proactively before expiry; a failed refresh degrades
+        to a muted row, never a modal.
+  - [ ] Session (5h) and weekly windows both surface with pace verdicts.
+  - [ ] Tests: response parsing + expiry/refresh logic, synthetic fixtures.
+  - [ ] Lint + typecheck + privacy green.
+
+### Slice 2.2 — `claude` CLI probe fallback
 
 - Status: ⏸ pending
-- Owner: <agent or human>
-- Files (planned edits): `<path>`, `<path>`
-- Files (do NOT edit): `<path>`
-- Depends on: (none) | Slice X.Y
-- Acceptance (EARS notation):
-  - [ ] When <trigger>, the system shall <behavior>.
-  - [ ] While <state>, the system shall <constraint>.
-  - [ ] If <event>, then the system shall <response>.
-  - [ ] Tests: <test names>
-  - [ ] Lint + typecheck green
+- Depends on: Slice 2.1
+- Context: spawn `claude` and read `/usage` when OAuth is unavailable. The
+  CLI reads its *own* keychain item, so it is silent. Output format is
+  unstable — parse defensively and fall back to `.failed` with a short reason.
 
-### Slice 1.2 — <next>
+### Slice 3.1 — Sign, notarize, Sparkle, Releases
 
 - Status: ⏸ pending
-- Files (planned edits): ...
+- Context: `make signing-init` should write `Local.xcconfig` (gitignored) from
+  the Developer ID already in the keychain. Add Sparkle via SPM. Hardened
+  Runtime is already on; App Sandbox must stay OFF.
 
 ## 3. Blockers / open questions
 
-- (none yet)
+- (none)
 
 ## 4. Recent decisions (append-only, newest first)
 
-- <date> — <decision> (<who decided>, <context>)
+- 2026-07-22 — App Sandbox stays OFF. Robut must read `~/.codex` and spawn the
+  `claude` CLI; notarization needs Hardened Runtime, not the sandbox.
+- 2026-07-22 — Never read another app's keychain item. Robut owns its own
+  credential. This is the entire reason the project exists.
+- 2026-07-22 — Providers limited to Claude + Codex for v1 (scope restraint).
+- 2026-07-22 — Sparkle auto-update is wanted (maintainer is fine with it).
 
 ## 5. Next actions (ordered)
 
-1. <immediate next action>
-2. <then>
-3. <then>
+1. **Slice 2.1** — Claude usage via Robut's own OAuth (see acceptance above).
+2. Slice 2.2 — `claude` CLI probe fallback.
+3. Slice 3.1 — signing, notarization, Sparkle, GitHub Releases.
+4. Design an app icon from the pixel-robot logo (`AppIcon` is referenced by
+   `project.yml` but the asset catalog does not exist yet).
+5. Add CI (`macos-latest`: build + test + lint + privacy gate).
 
 ## 6. Handoff note (fill when ending a session)
 
-<Last session>: <what was accomplished, what's half-finished, where to
-resume. Specific files + failing tests if applicable.>
+**State:** Robut builds, runs, and works for Codex. Three commits on `main`,
+all pushed, all gates green (29 tests / 5 suites, lint clean, privacy clean).
+
+**What works end to end:** menubar robot whose face+colour track worst-case
+pace; usage pane leading with the verdict sentence; Codex usage read with zero
+credentials from `~/.codex/sessions`; history backfill seeding ~1,500 samples
+on first launch so the pace verdict is meaningful immediately.
+
+**Not yet built:** Claude provider (the other half of the value), signing /
+notarization / Sparkle, CI, app icon.
+
+**Two traps to not re-introduce:**
+1. `.task` on a `MenuBarExtra` label never fires — startup must stay in
+   `RobutApp.init`. Symptom is an icon that renders fine and an empty history.
+2. Reading `Claude Code-credentials` reintroduces the exact keychain-prompt
+   bug this app exists to eliminate. Robut reads only its own item.

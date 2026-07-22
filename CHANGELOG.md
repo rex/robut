@@ -30,6 +30,13 @@ version bumps).
 
 ---
 
+## [0.3.1] — 2026-07-22 — Agent: Claude Opus 4.8
+### Changed
+- `TASK_STATE.md`: real phase table, slice definitions for the Claude
+  provider and distribution work, decision log, and a handoff note
+  naming the two traps worth not re-introducing (`MenuBarExtra` label
+  `.task` never fires; never read another app's keychain item).
+
 ## [0.3.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Added
 - **History backfill.** `UsageSource.backfill()` seeds pace history from
