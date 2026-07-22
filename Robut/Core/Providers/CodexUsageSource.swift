@@ -69,8 +69,9 @@ struct CodexUsageSource: UsageSource {
 
     // MARK: - File discovery
 
-    /// Newest-first rollout files, capped at `limit` (default `filesToScan`).
-    private func recentRolloutFiles(limit: Int? = nil) -> [URL] {
+    /// Newest-first rollout files, capped at `limit` (default `filesToScan`),
+    /// optionally ignoring anything modified before `modifiedAfter`.
+    private func recentRolloutFiles(limit: Int? = nil, modifiedAfter: Date? = nil) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
         guard let walker = FileManager.default.enumerator(
             at: sessionsRoot,
@@ -82,7 +83,9 @@ struct CodexUsageSource: UsageSource {
         for case let url as URL in walker where url.pathExtension == "jsonl" {
             let values = try? url.resourceValues(forKeys: Set(keys))
             guard values?.isRegularFile == true else { continue }
-            candidates.append((url, values?.contentModificationDate ?? .distantPast))
+            let modified = values?.contentModificationDate ?? .distantPast
+            if let modifiedAfter, modified < modifiedAfter { continue }
+            candidates.append((url, modified))
         }
 
         return candidates
@@ -131,16 +134,25 @@ struct CodexUsageSource: UsageSource {
     /// rate limits all along, so seed the history from that instead of
     /// making the user wait for it to accumulate.
     func backfill() async -> [UsageSnapshot] {
-        historicalSnapshots(limitFiles: 40)
+        // Only look at files new enough to hold samples that would
+        // survive pruning. Reading older rollouts costs real time and
+        // every sample from them is discarded immediately afterwards.
+        // The file cap is generous because backfill no longer blocks the
+        // first render — AppModel refreshes before seeding — so a richer
+        // history is worth the extra seconds in the background.
+        historicalSnapshots(
+            limitFiles: 60,
+            modifiedAfter: Date().addingTimeInterval(-UsageHistoryStore.retention)
+        )
     }
 
-    private func historicalSnapshots(limitFiles: Int) -> [UsageSnapshot] {
+    private func historicalSnapshots(limitFiles: Int, modifiedAfter: Date?) -> [UsageSnapshot] {
         guard FileManager.default.fileExists(atPath: sessionsRoot.path(percentEncoded: false)) else {
             return []
         }
 
         var snapshots: [UsageSnapshot] = []
-        for file in recentRolloutFiles(limit: limitFiles) {
+        for file in recentRolloutFiles(limit: limitFiles, modifiedAfter: modifiedAfter) {
             for entry in allRateLimits(in: file) {
                 let windows = entry.limits.windows(for: provider)
                 guard !windows.isEmpty else { continue }

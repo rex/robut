@@ -11,75 +11,6 @@
 
 import Foundation
 
-/// A single observation of a window's usage.
-struct UsageSample: Sendable, Hashable, Codable {
-    let at: Date
-    /// 0...1
-    let usedFraction: Double
-}
-
-/// How much to trust a burn-rate estimate.
-enum BurnConfidence: Sendable, Hashable {
-    /// Not enough data (fewer than 2 samples, or too short a span).
-    case insufficient
-    /// Real but thin — a short span, so treat the projection as a hint.
-    case low
-    /// Enough spread to mean something.
-    case good
-}
-
-/// Fraction-of-quota consumed per hour.
-struct BurnRate: Sendable, Hashable {
-    let perHour: Double
-    let confidence: BurnConfidence
-    /// Time between the first and last sample used for the fit.
-    let observedSpan: TimeInterval
-}
-
-/// The verdict for one window.
-enum PaceOutlook: Sendable, Hashable {
-    /// Quota already spent.
-    case exhausted
-    /// Not enough history to say anything honest yet.
-    case unknown
-    /// Effectively no consumption — you'll obviously make it.
-    case idle
-    /// On pace with room to spare.
-    case comfortable
-    /// On pace to *just* make it. Small overrun and you won't.
-    case tight
-    /// Projected to run dry before the window resets.
-    case shortfall
-
-    /// Worst-first ordering, so the menubar can show the binding constraint.
-    var severity: Int {
-        switch self {
-        case .exhausted: 5
-        case .shortfall: 4
-        case .tight: 3
-        case .comfortable: 2
-        case .idle: 1
-        case .unknown: 0
-        }
-    }
-}
-
-struct PaceVerdict: Sendable, Hashable {
-    let outlook: PaceOutlook
-    /// nil when there isn't enough history.
-    let burnPerHour: Double?
-    /// The rate you could sustain and land exactly at empty on reset.
-    let safePerHour: Double
-    /// burn ÷ safe. 1.0 = exactly on budget, 2.0 = twice too fast.
-    let paceRatio: Double?
-    /// When you'd hit zero at the current rate. nil if never (or idle).
-    let projectedExhaustion: Date?
-    /// How long *before* the reset you run dry. Only set for `.shortfall`.
-    let shortfall: TimeInterval?
-    /// Fraction you'd still have at reset if you keep this pace.
-    let headroomAtReset: Double?
-}
-
 enum PaceEngine {
 
     // MARK: - Tuning
@@ -209,7 +140,21 @@ enum PaceEngine {
 
         let hoursToReset = secondsToReset / 3600
         let safePerHour = remaining / hoursToReset
-        let burn = burnRate(samples: samples, now: now, lookback: lookback)
+
+        // `now` is itself an observation: the fetch we just did reported
+        // this window's current usage, so treat it as a sample.
+        //
+        // Without this, an idle machine reads as "unknown" forever. The
+        // newest *stored* sample can be many hours old — providers only
+        // log while you're using them — and sample-to-sample slope alone
+        // cannot see the flat stretch between then and now. Anchoring at
+        // `now` makes that stretch visible, which is what turns "no idea"
+        // into the correct answer: you haven't used any, so you'll make it.
+        var observed = samples
+        if observed.last?.at != now {
+            observed.append(UsageSample(at: now, usedFraction: window.usedFraction))
+        }
+        let burn = burnRate(samples: observed, now: now, lookback: lookback)
 
         guard burn.confidence != .insufficient else {
             return PaceVerdict(
@@ -226,9 +171,20 @@ enum PaceEngine {
             )
         }
 
+        return project(burn: burn, window: window, now: now, safePerHour: safePerHour)
+    }
+
+    /// Project a known, non-idle burn rate forward against the deadline.
+    private static func project(
+        burn: BurnRate,
+        window: UsageWindow,
+        now: Date,
+        safePerHour: Double
+    ) -> PaceVerdict {
+        let remaining = window.remainingFraction
+        let hoursToReset = window.resetsAt.timeIntervalSince(now) / 3600
         let ratio = burn.perHour / safePerHour
-        let hoursToEmpty = remaining / burn.perHour
-        let exhaustion = now.addingTimeInterval(hoursToEmpty * 3600)
+        let exhaustion = now.addingTimeInterval((remaining / burn.perHour) * 3600)
         let headroom = remaining - burn.perHour * hoursToReset
 
         if exhaustion >= window.resetsAt {

@@ -20,6 +20,17 @@ final class AppModel {
     private(set) var lastRefresh: Date?
     private(set) var isRefreshing = false
 
+    /// App-lifetime instance.
+    ///
+    /// NOT merely a convenience. Creating the model in `RobutApp.init()`
+    /// and parking it in `@State` is a lifetime race: SwiftUI does not
+    /// reliably retain a `@State` initial value created that early, so
+    /// the model could deallocate, the ticker's `[weak self]` would go
+    /// nil, and the refresh loop would spin forever doing nothing —
+    /// no crash, no logs, 0% CPU, and a permanently grey menubar icon.
+    /// Owning it statically makes the lifetime unambiguous.
+    static let shared = AppModel()
+
     private let sources: [any UsageSource]
     private let history: UsageHistoryStore
     private var ticker: Task<Void, Never>?
@@ -36,11 +47,23 @@ final class AppModel {
 
     func start() {
         guard ticker == nil else { return }
-        ticker = Task { [weak self] in
-            await self?.seedHistory()
+        Log.app.notice("start(): beginning refresh loop")
+        // Strong `self` on purpose: this object lives for the lifetime of
+        // the app (see `shared`), and a weak capture here previously let
+        // the loop silently no-op.
+        ticker = Task {
+            // Refresh BEFORE seeding. The first refresh is a small read
+            // and puts real numbers on screen immediately; backfill scans
+            // far more data and takes appreciably longer. Seeding first
+            // meant staring at a blank pane and a grey robot until it
+            // finished. Pace verdicts sharpen once the seed lands.
+            await self.refresh()
+            await self.seedHistory()
+            await self.refresh()
+
             while !Task.isCancelled {
-                await self?.refresh()
                 try? await Task.sleep(for: .seconds(Self.refreshInterval))
+                await self.refresh()
             }
         }
     }
@@ -55,13 +78,11 @@ final class AppModel {
         for source in sources {
             let snapshots = await source.backfill()
             guard !snapshots.isEmpty else { continue }
-            for snapshot in snapshots {
-                await history.record(snapshot)
-            }
-            let provider = source.provider.rawValue
-            Log.history.info(
-                "Seeded \(snapshots.count, privacy: .public) snapshot(s) for \(provider, privacy: .public)"
-            )
+            // Bulk path — see UsageHistoryStore.seed. Looping record()
+            // here is what previously stalled first launch for minutes.
+            let added = await history.seed(snapshots)
+            let message = "\(source.provider.rawValue): seeded \(added) of \(snapshots.count)"
+            Log.history.notice("\(message, privacy: .public)")
         }
     }
 
@@ -110,6 +131,19 @@ final class AppModel {
             }
         }
         verdicts = updated
+
+        // Notice level so it persists to the unified log — this is the
+        // one line that tells you whether the model or the view is at
+        // fault when the menubar looks wrong. Counts and outlook names
+        // only; nothing identifying.
+        let summary = updated.values
+            .map { String(describing: $0.outlook) }
+            .sorted()
+            .joined(separator: ",")
+        let count = updated.count
+        Log.pace.notice(
+            "verdicts=\(count, privacy: .public) outlooks=[\(summary, privacy: .public)]"
+        )
     }
 
     // MARK: - Derived state

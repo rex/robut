@@ -20,9 +20,15 @@ actor UsageHistoryStore {
     /// forever and the regression gets a long flat tail.
     static let minQuietInterval: TimeInterval = 10 * 60
 
+    /// How often the incremental path is allowed to prune. Pruning walks
+    /// every window and may rewrite the whole file, so doing it per
+    /// sample turns a linear ingest into a quadratic one.
+    static let pruneInterval: TimeInterval = 60 * 60
+
     private let fileURL: URL
     private var samples: [String: [UsageSample]] = [:]
     private var loaded = false
+    private var lastPrune = Date.distantPast
 
     init(fileURL: URL? = nil) {
         self.fileURL = fileURL ?? Self.defaultFileURL()
@@ -46,6 +52,9 @@ actor UsageHistoryStore {
     // MARK: - Writing
 
     /// Record every window in a snapshot. Returns the ids actually written.
+    ///
+    /// The incremental path: one appended line per new sample, and at most
+    /// one prune per `pruneInterval`. For bulk history use `seed(_:)`.
     @discardableResult
     func record(_ snapshot: UsageSnapshot) -> [String] {
         loadIfNeeded()
@@ -59,8 +68,37 @@ actor UsageHistoryStore {
             written.append(window.id)
         }
 
-        prune()
+        pruneIfDue()
         return written
+    }
+
+    /// Bulk-ingest historical snapshots (oldest first). Returns samples added.
+    ///
+    /// MUST be used instead of looping over `record(_:)` for backfill.
+    /// Backfill routinely produces >10,000 snapshots, and the incremental
+    /// path does a file append per sample plus periodic whole-file
+    /// rewrites — which turned a first launch into a multi-minute disk
+    /// stall with the app sitting at 0% CPU and a permanently grey icon.
+    /// This merges everything in memory, prunes once, and writes once.
+    @discardableResult
+    func seed(_ snapshots: [UsageSnapshot]) -> Int {
+        loadIfNeeded()
+        var added = 0
+
+        for snapshot in snapshots {
+            for window in snapshot.windows {
+                let sample = UsageSample(at: snapshot.sampledAt, usedFraction: window.usedFraction)
+                guard shouldRecord(sample, for: window.id) else { continue }
+                samples[window.id, default: []].append(sample)
+                added += 1
+            }
+        }
+
+        guard added > 0 else { return 0 }
+        pruneInMemory()
+        rewrite()
+        lastPrune = Date()
+        return added
     }
 
     private func shouldRecord(_ sample: UsageSample, for windowID: String) -> Bool {
@@ -90,7 +128,8 @@ actor UsageHistoryStore {
         for key in samples.keys {
             samples[key]?.sort { $0.at < $1.at }
         }
-        prune()
+        if pruneInMemory() { rewrite() }
+        lastPrune = Date()
     }
 
     private func append(_ sample: UsageSample, windowID: String) {
@@ -112,9 +151,18 @@ actor UsageHistoryStore {
         }
     }
 
-    /// Drop aged-out samples from memory, and rewrite the file when it has
-    /// drifted meaningfully from what we hold.
-    private func prune() {
+    /// Rate-limited prune for the incremental path.
+    private func pruneIfDue() {
+        guard Date().timeIntervalSince(lastPrune) >= Self.pruneInterval else { return }
+        lastPrune = Date()
+        if pruneInMemory() { rewrite() }
+    }
+
+    /// Drop aged-out samples from memory. Returns whether anything went,
+    /// so the caller decides if a rewrite is worth it. Deliberately does
+    /// NOT write — separating those is what keeps bulk ingest linear.
+    @discardableResult
+    private func pruneInMemory() -> Bool {
         let cutoff = Date().addingTimeInterval(-Self.retention)
         var removed = 0
         for (key, values) in samples {
@@ -122,7 +170,7 @@ actor UsageHistoryStore {
             removed += values.count - kept.count
             samples[key] = kept.isEmpty ? nil : kept
         }
-        if removed > 0 { rewrite() }
+        return removed > 0
     }
 
     private func rewrite() {

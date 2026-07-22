@@ -30,6 +30,58 @@ version bumps).
 
 ---
 
+## [0.4.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Fixed
+- **Robut was completely invisible in the menubar.** Three separate
+  causes, each of which produced the identical symptom — app running,
+  no crash, no logs, nothing on screen. Found by screenshotting the
+  menubar with the app running and again after quitting it: the images
+  were pixel-identical, proving the status item occupied zero width.
+  1. A SwiftUI `Canvas` as the `MenuBarExtra` label renders nothing.
+     The label backs an `NSStatusItem` rather than appearing in a normal
+     view hierarchy, and `Canvas` has no intrinsic size.
+  2. Replacing it with `NSImage(size:flipped:drawingHandler:)` failed
+     the same way — that initializer is *lazy*, so the image has no
+     representation and `Image(nsImage:)` gets nothing. The icon is now
+     rasterized into a concrete `NSBitmapImageRep` up front.
+  3. `.secondaryLabelColor` cannot resolve when drawing into an
+     offscreen bitmap (no `NSAppearance`); the dim tint is now concrete.
+- **The refresh loop silently never ran.** The model was created in
+  `RobutApp.init()` and parked in `@State`, which does not reliably
+  retain it that early — so the ticker's `[weak self]` went nil and the
+  loop spun forever doing nothing at 0% CPU. `AppModel.shared` now owns
+  the lifetime, and startup runs from `applicationDidFinishLaunching`
+  via an `NSApplicationDelegateAdaptor`, which is the only hook a
+  menubar-only SwiftUI app can actually rely on.
+- **First launch stalled for ~44s.** `seedHistory` looped `record(_:)`
+  over 10,000+ backfilled snapshots, and `record` pruned on every call —
+  rewriting the whole history file each time. Quadratic disk I/O, which
+  read as 0% CPU because it was blocked on the disk. Added
+  `UsageHistoryStore.seed(_:)`: merge in memory, prune once, write once.
+- **An idle machine reported "unknown" forever.** With no samples in the
+  burn-rate lookback the engine had nothing to fit, so it shrugged — even
+  though the answer was obvious (7% used, days until reset, untouched for
+  two days). `now` is now treated as an observation, since the fetch just
+  reported current usage. That makes the flat stretch visible and yields
+  the correct `idle` verdict.
+
+### Changed
+- Startup refreshes *before* backfilling, so real numbers appear in
+  ~2.5s instead of after the seed completes; backfill then enriches pace
+  history in the background.
+- Codex backfill skips rollout files older than the history retention
+  window — every sample from them was discarded immediately afterwards.
+- Split `PaceTypes.swift` out of `PaceEngine.swift` to stay within the
+  architecture gate's file-length limit.
+
+### Added
+- `UsageHistoryStore` test suite: bulk seed of 4,000 snapshots,
+  retention pruning, and incremental dedupe (including the guard against
+  a stale file rewriting history backwards). 35 tests across 6 suites.
+- A `notice`-level log line reporting verdict counts and outlooks — the
+  one line that distinguishes "the model is wrong" from "the view is
+  wrong" when the menubar looks off. Counts only, nothing identifying.
+
 ## [0.3.1] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Changed
 - `TASK_STATE.md`: real phase table, slice definitions for the Claude

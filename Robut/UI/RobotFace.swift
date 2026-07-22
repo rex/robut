@@ -5,6 +5,7 @@
 // reset — and the point is that a glance is genuinely enough, so you only
 // ever look closer when the robot stops looking calm.
 
+import AppKit
 import SwiftUI
 
 /// Robot expressions, mapped from the worst-case pace across all windows.
@@ -23,14 +24,22 @@ enum RobotMood: Sendable, Hashable {
         }
     }
 
-    var tint: Color {
+    /// The single source of truth for mood colour. It's an `NSColor`
+    /// because the menubar icon is drawn with AppKit — see `RobotIcon`.
+    var nsTint: NSColor {
         switch self {
-        case .calm: Color(red: 0.16, green: 0.79, blue: 0.50)
-        case .squint: Color(red: 0.96, green: 0.71, blue: 0.20)
-        case .alarmed: Color(red: 0.94, green: 0.33, blue: 0.31)
-        case .dim: Color.secondary
+        case .calm: NSColor(srgbRed: 0.16, green: 0.79, blue: 0.50, alpha: 1)
+        case .squint: NSColor(srgbRed: 0.96, green: 0.71, blue: 0.20, alpha: 1)
+        case .alarmed: NSColor(srgbRed: 0.94, green: 0.33, blue: 0.31, alpha: 1)
+        // A concrete grey, NOT .secondaryLabelColor: dynamic catalog
+        // colours resolve against an NSAppearance, and there isn't one
+        // when drawing into an offscreen bitmap — they come out black or
+        // fail outright. This grey reads acceptably on light and dark.
+        case .dim: NSColor(srgbRed: 0.55, green: 0.56, blue: 0.58, alpha: 1)
         }
     }
+
+    var tint: Color { Color(nsColor: nsTint) }
 
     var accessibilityDescription: String {
         switch self {

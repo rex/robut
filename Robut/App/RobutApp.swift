@@ -7,27 +7,22 @@ import SwiftUI
 
 @main
 struct RobutApp: App {
-    @State private var model: AppModel
+    // Startup runs from applicationDidFinishLaunching, NOT from a `.task`
+    // on the MenuBarExtra label (never fires) and NOT from `init()`
+    // (races the model's lifetime). See AppDelegate for the full story.
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
-    init() {
-        let model = AppModel()
-        _model = State(initialValue: model)
-
-        // Startup is kicked off here, NOT from a `.task` on the
-        // MenuBarExtra label.
-        //
-        // The label view backs an NSStatusItem rather than appearing in a
-        // normal view hierarchy, so its `.task` never fires — the app
-        // silently never polls. Learned the hard way: the symptom is an
-        // icon that renders fine and a history file that stays empty.
-        Task { @MainActor in model.start() }
-    }
+    @State private var model = AppModel.shared
 
     var body: some Scene {
         MenuBarExtra {
             UsagePane(model: model)
         } label: {
-            RobotFace(mood: model.mood)
+            // MUST be an Image backed by a CONCRETE bitmap. A SwiftUI
+            // Canvas renders zero-width here, and so does a lazy
+            // drawingHandler-based NSImage — in both cases the app runs
+            // fine and simply never appears in the menubar. See RobotIcon.
+            Image(nsImage: RobotIcon.image(for: model.mood))
         }
         // .window gives a real popover panel rather than an NSMenu, which
         // is what lets the pane render progress bars and live text.

@@ -93,6 +93,45 @@ struct VerdictTests {
         #expect(verdict.projectedExhaustion == nil)
     }
 
+    @Test("Stale history plus an unchanged reading reads as idle, not unknown")
+    func staleHistoryReadsAsIdle() {
+        // The real-world case that exposed this: Codex untouched for 56
+        // hours, so nothing sits in the burn-rate lookback. The engine
+        // used to shrug ("unknown", grey robot) when the honest answer is
+        // obvious — 7% spent, days until reset, nothing consumed since.
+        let samples = [
+            UsageSample(at: t0.addingTimeInterval(-58 * 3600), usedFraction: 0.07),
+            UsageSample(at: t0.addingTimeInterval(-56 * 3600), usedFraction: 0.07),
+        ]
+        let verdict = PaceEngine.verdict(
+            window: makeWindow(used: 0.07, resetsInHours: 82), samples: samples, now: t0
+        )
+        #expect(verdict.outlook == .idle)
+        #expect(abs((verdict.headroomAtReset ?? 0) - 0.93) < 0.001)
+    }
+
+    @Test("An empty history still resolves once a reading exists")
+    func firstEverReadingIsNotUnknownForever() {
+        // Even with no stored samples at all, the current reading anchors
+        // one end. One point is still not a rate, so this stays honest.
+        let verdict = PaceEngine.verdict(
+            window: makeWindow(used: 0.20, resetsInHours: 40), samples: [], now: t0
+        )
+        #expect(verdict.outlook == .unknown)
+    }
+
+    @Test("Usage climbing right up to now is measured, not smoothed away")
+    func recentClimbIsCaptured() {
+        // Stale samples then a jump in the current reading: the engine
+        // must see the climb rather than averaging it into idleness.
+        let samples = rampSamples(from: 0.40, to: 0.48, hours: 1)
+        let verdict = PaceEngine.verdict(
+            window: makeWindow(used: 0.50, resetsInHours: 10), samples: samples, now: t0
+        )
+        #expect(verdict.outlook == .shortfall)
+        #expect((verdict.burnPerHour ?? 0) > 0.05)
+    }
+
     @Test("Outlook severity orders worst-first for the menubar")
     func severityOrdering() {
         #expect(PaceOutlook.exhausted.severity > PaceOutlook.shortfall.severity)
