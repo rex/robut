@@ -30,6 +30,13 @@ version bumps).
 
 ---
 
+## [0.5.1] — 2026-07-22 — Agent: Claude Opus 4.8
+### Changed
+- `TASK_STATE.md`: Phase 2 marked in-progress — Claude is built and unit
+  tested, but the response parser was written from field names and has
+  not yet seen a real payload. Records how to diagnose that (keys-only
+  logging under subsystem `com.robut.app`, category `providers`).
+
 ## [0.5.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Added
 - **Claude usage** — the other half of the app. Reads

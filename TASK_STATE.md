@@ -38,7 +38,7 @@ bug it exists to fix).
 |---|---|---|---|
 | 0 | Scaffold + privacy gate | ✅ done | Repo bootstrapped; privacy gate blocking on every commit |
 | 1 | Core app + Codex | ✅ done | Builds, launches to menubar, real Codex usage + pace verdict |
-| 2 | Claude provider | ⏸ pending | Claude session + weekly windows shown, with zero keychain prompts |
+| 2 | Claude provider | 🟡 in-prog | Code complete + tested; awaiting a real token to verify live |
 | 3 | Distribution | ⏸ pending | Signed, notarized, Sparkle auto-update, published to Releases |
 | 4 | CI | ⏸ pending | `macos-latest` workflow running build + test + lint + privacy |
 
@@ -46,9 +46,9 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 2. Slices (vertical, atomic, independently mergeable)
 
-### Slice 2.1 — Claude usage via Robut's own OAuth
+### Slice 2.1 — Claude usage via Robut's own token
 
-- Status: ⏸ pending — **the next thing to build**
+- Status: 🟡 built, unverified against the live endpoint
 - Depends on: (none)
 - Files (planned): `Robut/Core/Auth/RobutKeychain.swift`,
   `Robut/Core/Auth/ClaudeOAuth.swift`, `Robut/Core/Providers/ClaudeUsageSource.swift`
@@ -94,8 +94,14 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 5. Next actions (ordered)
 
-1. **Slice 2.1** — Claude usage via Robut's own OAuth (see acceptance above).
-2. Slice 2.2 — `claude` CLI probe fallback.
+1. **Verify Claude live**: run `claude setup-token`, paste it into Robut's
+   "Set up" sheet, confirm the three windows render. The response parser was
+   written from field names (`five_hour` / `seven_day` / `seven_day_opus`) and
+   has never seen a real payload — if it fails, Robut logs the response's
+   top-level KEYS only (never the body) at notice level under subsystem
+   `com.robut.app`, category `providers`.
+2. Slice 2.2 — `claude` CLI probe fallback (only if the token path proves
+   insufficient; `claude auth status --json` plumbing already exists).
 3. Slice 3.1 — signing, notarization, Sparkle, GitHub Releases.
 4. Design an app icon from the pixel-robot logo (`AppIcon` is referenced by
    `project.yml` but the asset catalog does not exist yet).
