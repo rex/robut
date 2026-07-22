@@ -30,6 +30,14 @@ version bumps).
 
 ---
 
+## [0.4.1] — 2026-07-22 — Agent: Claude Opus 4.8
+### Changed
+- `AGENTS.md` §9: record the menubar traps discovered while making the
+  status item appear — `MenuBarExtra` labels are not normal views, app
+  lifetime must not rest on SwiftUI `@State`, 0% CPU means blocked rather
+  than idle, and bulk history must go through `seed(_:)`. Includes the
+  screenshot A/B technique that distinguishes "hidden" from "zero width".
+
 ## [0.4.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Fixed
 - **Robut was completely invisible in the menubar.** Three separate

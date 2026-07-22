@@ -98,6 +98,25 @@ change gets a corresponding test update.
 
 <!-- Update whenever an agent makes the same mistake twice. -->
 
+- **The `MenuBarExtra` label is not a normal view.** It backs an
+  `NSStatusItem`, so: `.task` on it never fires; a `Canvas` renders at zero
+  width; and a lazy `NSImage(size:flipped:drawingHandler:)` also renders
+  nothing (no representation for `Image(nsImage:)` to draw). The label must
+  be an `Image` backed by a concrete `NSBitmapImageRep` — see `RobotIcon`.
+  Every one of these fails identically: app runs, no crash, no logs,
+  nothing on screen. **To tell "invisible" from "not drawn": screenshot
+  the menubar with the app running and again after quitting it.** Identical
+  images mean the status item has zero width.
+- **App lifetime must not depend on SwiftUI `@State`.** A model created in
+  `App.init()` and parked in `@State` is not reliably retained; a `[weak
+  self]` task loop then silently no-ops at 0% CPU. Use `AppModel.shared`
+  plus `applicationDidFinishLaunching` (`AppDelegate`).
+- **0% CPU means blocked, not idle.** Both the stalled refresh loop and the
+  44-second first launch showed 0% CPU — one was a nil `self`, the other
+  was quadratic disk I/O. Sample the process before assuming it's a hang.
+- **Bulk history goes through `UsageHistoryStore.seed(_:)`**, never a loop
+  over `record(_:)`. Backfill is 10,000+ snapshots and `record` prunes
+  (rewriting the whole file) on a timer.
 - **Do NOT `git config core.hooksPath`.** It shadows `.git/hooks/` and
   silently disables the skeleton's post-commit auto-push. The privacy gate
   is a `local` hook in `.pre-commit-config.yaml`; use `make hooks`.
