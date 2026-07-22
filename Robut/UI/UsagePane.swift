@@ -9,6 +9,7 @@ struct UsagePane: View {
     @Bindable var model: AppModel
     /// Drives the countdown text without re-fetching anything.
     @State private var now = Date()
+    @State private var showingClaudeSetup = false
 
     private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -36,7 +37,13 @@ struct UsagePane: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(model.unavailable, id: \.provider) { entry in
-                        UnavailableRow(provider: entry.provider, state: entry.state)
+                        UnavailableRow(
+                            provider: entry.provider,
+                            state: entry.state,
+                            action: entry.provider == .claude
+                                ? { showingClaudeSetup = true }
+                                : nil
+                        )
                     }
                 }
                 .padding(.horizontal, 14)
@@ -49,6 +56,9 @@ struct UsagePane: View {
         .frame(width: 300)
         .onReceive(tick) { now = $0 }
         .task { await model.refresh() }
+        .sheet(isPresented: $showingClaudeSetup) {
+            ClaudeTokenSheet(model: model)
+        }
     }
 
     private var header: some View {
@@ -149,6 +159,8 @@ private struct WindowRow: View {
 private struct UnavailableRow: View {
     let provider: Provider
     let state: ProviderState
+    /// Present when there's something the user can actually do about it.
+    let action: (() -> Void)?
 
     private var message: String {
         switch state {
@@ -163,8 +175,17 @@ private struct UnavailableRow: View {
         HStack(spacing: 6) {
             Circle().frame(width: 5, height: 5).foregroundStyle(.tertiary)
             Text(provider.displayName).font(.system(size: 11, weight: .medium))
-            Text(message).font(.system(size: 10)).foregroundStyle(.secondary)
-            Spacer()
+            Text(message)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if let action {
+                Button("Set up", action: action)
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
+            }
         }
     }
 }

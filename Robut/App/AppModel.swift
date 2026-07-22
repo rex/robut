@@ -37,8 +37,9 @@ final class AppModel {
     private var didSeedHistory = false
 
     init(sources: [any UsageSource]? = nil, history: UsageHistoryStore = UsageHistoryStore()) {
-        // v1 tracks Codex (zero-auth, local) and Claude (own OAuth).
-        self.sources = sources ?? [CodexUsageSource()]
+        // v1 tracks Codex (zero-auth, read from local session files) and
+        // Claude (Robut's own token, in Robut's own keychain item).
+        self.sources = sources ?? [CodexUsageSource(), ClaudeUsageSource()]
         self.history = history
         for source in self.sources { states[source.provider] = .loading }
     }
@@ -168,6 +169,30 @@ final class AppModel {
     }
 
     var mood: RobotMood { RobotMood(outlook: worstOutlook) }
+
+    // MARK: - Claude token
+
+    /// Whether Robut holds a Claude token. Reads its OWN keychain item,
+    /// so this never prompts.
+    var hasClaudeToken: Bool { RobutKeychain.has(.claudeToken) }
+
+    /// Store a token from `claude setup-token`. The value is never
+    /// logged, echoed, or written anywhere but the keychain.
+    func saveClaudeToken(_ token: String) {
+        do {
+            try RobutKeychain.write(token, to: .claudeToken)
+            Log.auth.notice("claude token stored")
+        } catch {
+            Log.auth.error("failed to store claude token")
+        }
+        Task { await refresh() }
+    }
+
+    func clearClaudeToken() {
+        try? RobutKeychain.delete(.claudeToken)
+        Log.auth.notice("claude token removed")
+        Task { await refresh() }
+    }
 
     /// Providers in a non-ready state, for the pane's muted footer rows.
     var unavailable: [(provider: Provider, state: ProviderState)] {

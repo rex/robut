@@ -30,6 +30,48 @@ version bumps).
 
 ---
 
+## [0.5.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Added
+- **Claude usage** — the other half of the app. Reads
+  `GET https://api.anthropic.com/api/oauth/usage` and surfaces all three
+  windows Claude bills against: the 5-hour session limit, the seven-day
+  limit, and the separate seven-day **Opus** limit.
+- **`RobutKeychain`** — the only keychain surface in the codebase, and it
+  touches *only items Robut created*. Reading another app's item is the
+  exact bug this project exists to eliminate, so that rule now has one
+  enforcing chokepoint rather than being a convention.
+- **Token setup via `claude setup-token`** — Anthropic's official way to
+  mint a long-lived subscription token. The user runs it once and pastes
+  the result into Robut, which stores it in its own keychain item and is
+  therefore never prompted again. Deliberately NOT a browser OAuth flow:
+  that would mean presenting Claude Code's own OAuth client id from a
+  third-party app, and there is no public client registration for
+  third-party apps. The sanctioned command is safer and less code.
+- **`ClaudeCLI`** — runs `claude auth status --json` to distinguish
+  "Claude Code isn't installed", "installed but signed out", and "signed
+  in, just needs a token". Only `loggedIn` and `subscriptionType` are
+  modelled; the payload's email, org id and org name are deliberately not
+  decoded so they cannot later be logged by accident. Has a watchdog that
+  terminates the process on timeout, so a wedged CLI can't wedge Robut.
+- **`ClaudeTokenSheet`** — one-time setup UI. `SecureField`, copyable
+  command, and a Remove option. The token goes straight to the keychain;
+  it is never logged, never written to a file, and never redisplayed.
+- 11 Claude tests using a stubbed `URLProtocol` and injected keychain/CLI,
+  so nothing touches a real credential or spawns a process. 46 tests
+  across 7 suites.
+
+### Changed
+- **`UsageWindow` gained a `variant`.** Claude bills a general seven-day
+  limit *and* a seven-day Opus limit — both `.weekly`, so without a
+  discriminator they collided on `id` and would have silently overwritten
+  each other's pace history. There's a regression test for it.
+
+### Fixed
+- Two Swift 6 `Sendable` violations in the CLI process wrapper: a
+  non-`@Sendable` local function captured across queues, and a
+  `DispatchWorkItem` captured in a `@Sendable` closure. Both are real
+  concurrency faults, not annotation noise. The build is warning-free.
+
 ## [0.4.1] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Changed
 - `AGENTS.md` §9: record the menubar traps discovered while making the

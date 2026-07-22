@@ -68,23 +68,48 @@ struct UsageWindow: Sendable, Hashable, Identifiable, Codable {
 
     let provider: Provider
     let kind: Kind
+    /// Distinguishes several windows of the SAME kind. Claude bills a
+    /// general seven-day limit and a separate seven-day Opus limit; both
+    /// are `.weekly`, so without this they'd collide on `id` and
+    /// overwrite each other's history.
+    let variant: String?
     /// 0...1. Providers report percent; normalize at the boundary.
     let usedFraction: Double
     let resetsAt: Date
     /// Full length of the window, used to compute how far into it we are.
     let length: TimeInterval
 
+    init(
+        provider: Provider,
+        kind: Kind,
+        variant: String? = nil,
+        usedFraction: Double,
+        resetsAt: Date,
+        length: TimeInterval
+    ) {
+        self.provider = provider
+        self.kind = kind
+        self.variant = variant
+        self.usedFraction = usedFraction
+        self.resetsAt = resetsAt
+        self.length = length
+    }
+
     /// Stable across refreshes — this is the key history is bucketed by.
-    var id: String { "\(provider.rawValue).\(kind.slug)" }
+    var id: String {
+        let base = "\(provider.rawValue).\(kind.slug)"
+        return variant.map { "\(base).\($0)" } ?? base
+    }
 
     var label: String {
-        switch kind {
+        let base: String = switch kind {
         case .session: "Session"
         case .weekly: "Weekly"
         case .other(let minutes) where minutes % (60 * 24) == 0: "\(minutes / (60 * 24))-day"
         case .other(let minutes) where minutes % 60 == 0: "\(minutes / 60)-hour"
         case .other(let minutes): "\(minutes)-minute"
         }
+        return variant.map { "\(base) · \($0)" } ?? base
     }
 
     var remainingFraction: Double { max(0, 1 - usedFraction) }
