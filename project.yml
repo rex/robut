@@ -67,6 +67,13 @@ targets:
       testTargets:
         - RobutTests
       gatherCoverageData: true
+      # Belt and braces alongside AppDelegate's XCTest check. A unit-test
+      # bundle uses the app as its TEST HOST, so `xcodebuild test`
+      # actually LAUNCHES Robut — without a guard, every test run made
+      # live provider network calls.
+      testPlans: []
+      environmentVariables:
+        ROBUT_DISABLE_NETWORK: '1'
 
   # ============================================================
   # RobutTests — Swift Testing. The pace engine is the priority.

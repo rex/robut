@@ -30,6 +30,24 @@ version bumps).
 
 ---
 
+## [0.9.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Fixed
+- **`make test` was making live network calls to Anthropic.** A unit-test
+  bundle for an app target uses the app itself as its TEST HOST, so
+  `xcodebuild test` genuinely LAUNCHES Robut:
+  `applicationDidFinishLaunching` fired, the refresh loop started, and
+  every single test run hit the provider APIs for real. Roughly a dozen
+  runs during development kept an Anthropic rate limit alive that was
+  supposed to be expiring — a test suite silently acting as a request
+  generator against the user's own account.
+  `AppDelegate.isRunningTests` now blocks startup under XCTest (checked
+  via `XCTestConfigurationFilePath`, sibling variables, and the
+  `XCTestCase` runtime class), with `ROBUT_DISABLE_NETWORK` as a manual
+  override and the same variable set on the test scheme for belt and
+  braces. Verified by streaming the app's log during a test run: it now
+  reports `test host launch — refresh loop NOT started`, and the only
+  provider lines are from stubbed `URLProtocol` fakes.
+
 ## [0.8.1] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Changed
 - **Print-mode CLI usage confirmed NOT viable.** `claude -p "/usage"

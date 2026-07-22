@@ -98,6 +98,13 @@ change gets a corresponding test update.
 
 <!-- Update whenever an agent makes the same mistake twice. -->
 
+- **`make test` LAUNCHES the app.** A unit-test bundle for an app target
+  uses the app as its TEST HOST, so `xcodebuild test` runs
+  `applicationDidFinishLaunching` for real. Without a guard, every test
+  run made live provider network calls — which is how a test suite
+  quietly became a request generator and kept an Anthropic rate limit
+  alive. `AppDelegate.isRunningTests` blocks it; don't remove it, and
+  don't add network calls to app startup that bypass it.
 - **Never auto-retry an authentication failure.** A rejected credential
   cannot fix itself, so retrying on the refresh timer is not resilience —
   it's a self-inflicted DoS. Robut did exactly this and got the machine
