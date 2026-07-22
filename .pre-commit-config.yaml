@@ -57,6 +57,14 @@ repos:
         language: script
         pass_filenames: false
         always_run: true
+      # SwiftLint — this repo's actual linter. Without it here, `make
+      # lint` was advisory only and a violation could sail into a commit.
+      - id: swiftlint
+        name: swiftlint (strict)
+        entry: swiftlint lint --quiet --strict
+        language: system
+        types_or: [swift]
+        pass_filenames: false
       - id: check-architecture
         name: architecture line limits (VIBE.yaml)
         entry: scripts/check_architecture.py

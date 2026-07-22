@@ -30,6 +30,14 @@ version bumps).
 
 ---
 
+## [0.7.1] — 2026-07-22 — Agent: Claude Opus 4.8
+### Fixed
+- **SwiftLint was never actually gating commits.** `make lint` ran it, but
+  `.pre-commit-config.yaml` didn't, so a violation could sail into a
+  commit whenever `make lint` wasn't run by hand — which is exactly what
+  happened one commit ago. SwiftLint is now a blocking pre-commit hook,
+  and the violation it should have caught is fixed.
+
 ## [0.7.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Fixed
 - **Robut retried a rejected token on every refresh and got the machine

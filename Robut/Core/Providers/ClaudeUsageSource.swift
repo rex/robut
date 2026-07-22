@@ -71,9 +71,8 @@ struct ClaudeUsageSource: UsageSource {
                 // itself, and retrying on a timer is what got this
                 // machine IP-rate-limited in the first place.
                 let detail = apiErrorType(data).map { " (\($0))" } ?? ""
-                Log.providers.notice(
-                    "claude usage auth rejected: HTTP \(http.statusCode, privacy: .public)\(detail, privacy: .public)"
-                )
+                let summary = "HTTP \(http.statusCode)\(detail)"
+                Log.providers.notice("claude usage auth rejected: \(summary, privacy: .public)")
                 return .failed(
                     reason: "Token rejected\(detail) — tap to set up again",
                     retry: .userAction
