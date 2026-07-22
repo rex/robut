@@ -59,26 +59,70 @@ struct ClaudeUsageSource: UsageSource {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
-                return .failed(reason: "Unexpected response from Anthropic")
+                return .failed(reason: "Unexpected response from Anthropic", retry: .normal)
             }
 
             switch http.statusCode {
             case 200:
                 return decode(data, now: now)
+
             case 401, 403:
-                return .failed(reason: "Token rejected — run `claude setup-token` again")
+                // NEVER auto-retry: a rejected credential cannot fix
+                // itself, and retrying on a timer is what got this
+                // machine IP-rate-limited in the first place.
+                let detail = apiErrorType(data).map { " (\($0))" } ?? ""
+                Log.providers.notice(
+                    "claude usage auth rejected: HTTP \(http.statusCode, privacy: .public)\(detail, privacy: .public)"
+                )
+                return .failed(
+                    reason: "Token rejected\(detail) — tap to set up again",
+                    retry: .userAction
+                )
+
             case 429:
-                return .failed(reason: "Rate limited by Anthropic; will retry")
+                let pause = retryAfter(http) ?? RetryPolicy.defaultRateLimitPause
+                Log.providers.notice(
+                    "claude usage rate limited; pausing \(Int(pause), privacy: .public)s"
+                )
+                return .failed(
+                    reason: "Rate limited by Anthropic — paused for \(Int(pause / 60))m",
+                    retry: .after(pause)
+                )
+
             default:
-                return .failed(reason: "Anthropic returned HTTP \(http.statusCode)")
+                Log.providers.notice(
+                    "claude usage HTTP \(http.statusCode, privacy: .public)"
+                )
+                return .failed(
+                    reason: "Anthropic returned HTTP \(http.statusCode)",
+                    retry: .after(5 * 60)
+                )
             }
         } catch is CancellationError {
-            return .failed(reason: "Cancelled")
+            return .failed(reason: "Cancelled", retry: .normal)
         } catch {
             // Deliberately not interpolating the error: URLError
             // descriptions can contain the full request URL.
-            return .failed(reason: "Couldn't reach Anthropic")
+            return .failed(reason: "Couldn't reach Anthropic", retry: .normal)
         }
+    }
+
+    /// Anthropic errors are `{"error":{"type":…,"message":…}}`. The type
+    /// is API metadata and safe to surface; the message can be verbose,
+    /// so only the type is used.
+    private func apiErrorType(_ data: Data) -> String? {
+        struct Envelope: Decodable {
+            struct APIError: Decodable { let type: String? }
+            let error: APIError?
+        }
+        return try? JSONDecoder().decode(Envelope.self, from: data).error?.type
+    }
+
+    private func retryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
+        guard let raw = response.value(forHTTPHeaderField: "retry-after"),
+              let seconds = TimeInterval(raw.trimmingCharacters(in: .whitespaces))
+        else { return nil }
+        return min(max(seconds, 60), 3600)
     }
 
     // MARK: - States
@@ -91,7 +135,7 @@ struct ClaudeUsageSource: UsageSource {
         guard let status = await authStatus(), status.loggedIn else {
             return .notConfigured
         }
-        return .failed(reason: "Run `claude setup-token`, then add it in Robut")
+        return .failed(reason: "Run `claude setup-token`, then add it in Robut", retry: .userAction)
     }
 
     // MARK: - Decoding
@@ -102,12 +146,12 @@ struct ClaudeUsageSource: UsageSource {
             let keys = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
                 .flatMap { $0?.keys.sorted().joined(separator: ",") } ?? "unparseable"
             Log.providers.notice("claude usage decode failed; keys=[\(keys, privacy: .public)]")
-            return .failed(reason: "Couldn't read Anthropic's usage response")
+            return .failed(reason: "Couldn't read Anthropic's usage response", retry: .after(10 * 60))
         }
 
         let windows = payload.windows(provider: provider, now: now)
         guard !windows.isEmpty else {
-            return .failed(reason: "Anthropic reported no usage windows")
+            return .failed(reason: "Anthropic reported no usage windows", retry: .after(10 * 60))
         }
 
         return .ready(UsageSnapshot(

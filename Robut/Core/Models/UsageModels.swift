@@ -139,11 +139,36 @@ enum ProviderState: Sendable {
     /// Provider isn't set up on this machine at all (no ~/.codex, not
     /// signed in). Not an error — just nothing to show.
     case notConfigured
-    /// Configured but the read failed. Carries a short human reason.
-    case failed(reason: String)
+    /// Configured but the read failed. Carries a short human reason and,
+    /// crucially, whether retrying could ever help.
+    case failed(reason: String, retry: RetryPolicy)
 
     var snapshot: UsageSnapshot? {
         if case .ready(let snapshot) = self { return snapshot }
         return nil
     }
+
+    var retryPolicy: RetryPolicy {
+        if case .failed(_, let retry) = self { return retry }
+        return .normal
+    }
+}
+
+/// When a failed provider may be polled again.
+///
+/// This exists because Robut once retried a rejected token on every tick
+/// and got the machine IP-rate-limited by Anthropic. A failure that
+/// cannot fix itself must not be retried on a timer — that's not
+/// resilience, it's a denial-of-service against your own account.
+enum RetryPolicy: Sendable, Hashable {
+    /// Back off on the normal refresh interval.
+    case normal
+    /// Wait at least this long. Used for rate limits and server errors.
+    case after(TimeInterval)
+    /// Never automatically. Requires the user to change something —
+    /// a rejected credential is the canonical case.
+    case userAction
+
+    /// Sensible pause for a rate limit when the server doesn't say.
+    static let defaultRateLimitPause: TimeInterval = 15 * 60
 }

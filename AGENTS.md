@@ -98,6 +98,13 @@ change gets a corresponding test update.
 
 <!-- Update whenever an agent makes the same mistake twice. -->
 
+- **Never auto-retry an authentication failure.** A rejected credential
+  cannot fix itself, so retrying on the refresh timer is not resilience —
+  it's a self-inflicted DoS. Robut did exactly this and got the machine
+  IP-rate-limited by Anthropic (that endpoint 429s by IP, even
+  unauthenticated). Every `.failed` now carries a `RetryPolicy`;
+  `.userAction` means only the user changing something clears it, and
+  `AppModel` gates each provider on it.
 - **The `MenuBarExtra` label is not a normal view.** It backs an
   `NSStatusItem`, so: `.task` on it never fires; a `Canvas` renders at zero
   width; and a lazy `NSImage(size:flipped:drawingHandler:)` also renders

@@ -30,6 +30,27 @@ version bumps).
 
 ---
 
+## [0.7.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Fixed
+- **Robut retried a rejected token on every refresh and got the machine
+  IP-rate-limited by Anthropic.** A rejected credential cannot fix itself,
+  so polling it is not resilience — it is a self-inflicted denial of
+  service against the user's own account. Confirmed IP-scoped: the
+  endpoint returned 429 to an unauthenticated request from the same
+  machine.
+
+### Added
+- **`RetryPolicy` on every provider failure** — `.normal`, `.after(_)`, or
+  `.userAction`. `AppModel` gates each provider independently: a
+  `.userAction` failure is never polled again until the user actually
+  changes something (saving a token, clicking Refresh), and `.after`
+  honours a `Retry-After` header when the server sends one.
+- Anthropic's error `type` (e.g. `authentication_error`) is now surfaced
+  in the failure reason and logged, so a rejection is diagnosable instead
+  of opaque. Only the type — never the message or body.
+- Tests for all of it: 401/403 must yield `.userAction`, 429 must back
+  off, `Retry-After` must win over the default pause. 48 tests, 7 suites.
+
 ## [0.6.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Fixed
 - **Clicking the token field made the whole UI disappear.** The setup UI

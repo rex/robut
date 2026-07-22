@@ -36,6 +36,12 @@ final class AppModel {
     private var ticker: Task<Void, Never>?
     private var didSeedHistory = false
 
+    /// Per-provider gate. A provider that just told us "don't ask again
+    /// until X" is skipped entirely until X — this is what stops a
+    /// rejected credential from being retried on a timer, which is how
+    /// Robut previously got this machine IP-rate-limited by Anthropic.
+    private var nextFetchAllowed: [Provider: Date] = [:]
+
     init(sources: [any UsageSource]? = nil, history: UsageHistoryStore = UsageHistoryStore()) {
         // v1 tracks Codex (zero-auth, read from local session files) and
         // Claude (Robut's own token, in Robut's own keychain item).
@@ -101,9 +107,14 @@ final class AppModel {
 
         let now = Date()
 
+        // Skip anything still in its back-off window. Its previous state
+        // stays on screen, so the user keeps seeing why.
+        let due = sources.filter { isDue($0.provider, at: now) }
+        guard !due.isEmpty else { return }
+
         // Sources are independent; a slow one must not delay the others.
         let results = await withTaskGroup(of: (Provider, ProviderState).self) { group in
-            for source in sources {
+            for source in due {
                 group.addTask { (source.provider, await source.fetch(now: now)) }
             }
             var collected: [(Provider, ProviderState)] = []
@@ -113,6 +124,7 @@ final class AppModel {
 
         for (provider, state) in results {
             states[provider] = state
+            applyBackoff(state.retryPolicy, to: provider, at: now)
             if let snapshot = state.snapshot {
                 await history.record(snapshot)
             }
@@ -170,6 +182,33 @@ final class AppModel {
 
     var mood: RobotMood { RobotMood(outlook: worstOutlook) }
 
+    // MARK: - Back-off
+
+    private func isDue(_ provider: Provider, at now: Date) -> Bool {
+        guard let until = nextFetchAllowed[provider] else { return true }
+        return now >= until
+    }
+
+    private func applyBackoff(_ policy: RetryPolicy, to provider: Provider, at now: Date) {
+        switch policy {
+        case .normal:
+            nextFetchAllowed[provider] = nil
+        case .after(let pause):
+            nextFetchAllowed[provider] = now.addingTimeInterval(pause)
+        case .userAction:
+            // Only an explicit user action clears this. Retrying a
+            // rejected credential on a timer is a self-inflicted DoS.
+            nextFetchAllowed[provider] = .distantFuture
+        }
+    }
+
+    /// Clear every gate and refresh now. Only ever called from a genuine
+    /// user action (the Refresh button, saving a token).
+    func retryNow() async {
+        nextFetchAllowed.removeAll()
+        await refresh()
+    }
+
     // MARK: - Claude token
 
     /// Whether Robut holds a Claude token. Reads its OWN keychain item,
@@ -185,13 +224,15 @@ final class AppModel {
         } catch {
             Log.auth.error("failed to store claude token")
         }
-        Task { await refresh() }
+        // A new token is exactly the user action that clears a
+        // `.userAction` back-off.
+        Task { await retryNow() }
     }
 
     func clearClaudeToken() {
         try? RobutKeychain.delete(.claudeToken)
         Log.auth.notice("claude token removed")
-        Task { await refresh() }
+        Task { await retryNow() }
     }
 
     /// Providers in a non-ready state, for the pane's muted footer rows.

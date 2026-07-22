@@ -16,6 +16,7 @@ import Testing
 class StubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var body = Data()
+    nonisolated(unsafe) static var headers: [String: String] = [:]
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -23,7 +24,7 @@ class StubURLProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         let response = HTTPURLResponse(
             url: request.url ?? ClaudeUsageSource.defaultEndpoint,
-            statusCode: Self.status, httpVersion: nil, headerFields: nil
+            statusCode: Self.status, httpVersion: nil, headerFields: Self.headers
         )
         if let response {
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -34,9 +35,12 @@ class StubURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func stopLoading() {}
 
-    static func stub(status: Int = 200, json: String) -> URLSession {
+    static func stub(
+        status: Int = 200, json: String, headers: [String: String] = [:]
+    ) -> URLSession {
         Self.status = status
         Self.body = Data(json.utf8)
+        Self.headers = headers
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubURLProtocol.self]
         return URLSession(configuration: configuration)
@@ -49,13 +53,14 @@ struct ClaudeUsageSourceTests {
     private func source(
         json: String = "{}",
         status: Int = 200,
+        headers: [String: String] = [:],
         token: String? = "synthetic-token",
         authStatus: ClaudeCLI.AuthStatus? = nil
     ) -> ClaudeUsageSource {
         ClaudeUsageSource(
             token: { token },
             authStatus: { authStatus },
-            session: StubURLProtocol.stub(status: status, json: json)
+            session: StubURLProtocol.stub(status: status, json: json, headers: headers)
         )
     }
 
@@ -124,22 +129,50 @@ struct ClaudeUsageSourceTests {
         #expect(snapshot.windows.first?.usedFraction == 1.0)
     }
 
-    @Test("A rejected token asks for a new one instead of failing silently")
-    func rejectedToken() async {
-        let state = await source(json: "{}", status: 401).fetch(now: t0)
-        guard case .failed(let reason) = state else {
-            Issue.record("Expected .failed for HTTP 401"); return
+    @Test("A rejected token is NEVER retried automatically", arguments: [401, 403])
+    func rejectedToken(status: Int) async {
+        // The bug this guards: retrying a rejected credential on the
+        // refresh timer got the machine IP-rate-limited by Anthropic.
+        let body = #"{"error":{"type":"authentication_error","message":"nope"}}"#
+        let state = await source(json: body, status: status).fetch(now: t0)
+
+        guard case .failed(let reason, let retry) = state else {
+            Issue.record("Expected .failed for HTTP \(status)"); return
         }
-        #expect(reason.contains("setup-token"))
+        #expect(retry == .userAction)
+        // Surfaces Anthropic's error type so the cause is diagnosable.
+        #expect(reason.contains("authentication_error"))
     }
 
-    @Test("Server errors surface the status, not a stack trace")
+    @Test("A rate limit backs off rather than hammering")
+    func rateLimited() async {
+        let state = await source(json: "{}", status: 429).fetch(now: t0)
+        guard case .failed(_, let retry) = state else {
+            Issue.record("Expected .failed for HTTP 429"); return
+        }
+        #expect(retry == .after(RetryPolicy.defaultRateLimitPause))
+    }
+
+    @Test("A Retry-After header is honoured over the default pause")
+    func honoursRetryAfter() async {
+        let state = await source(
+            json: "{}", status: 429, headers: ["Retry-After": "120"]
+        ).fetch(now: t0)
+
+        guard case .failed(_, let retry) = state else {
+            Issue.record("Expected .failed for HTTP 429"); return
+        }
+        #expect(retry == .after(120))
+    }
+
+    @Test("Server errors surface the status and back off")
     func serverError() async {
         let state = await source(json: "{}", status: 503).fetch(now: t0)
-        guard case .failed(let reason) = state else {
+        guard case .failed(let reason, let retry) = state else {
             Issue.record("Expected .failed for HTTP 503"); return
         }
         #expect(reason.contains("503"))
+        #expect(retry == .after(5 * 60))
     }
 
     @Test("Unreadable JSON fails without leaking the body")
@@ -160,10 +193,12 @@ struct ClaudeUsageSourceTests {
             authStatus: ClaudeCLI.AuthStatus(loggedIn: true, subscriptionType: "synthetic")
         ).fetch(now: t0)
 
-        guard case .failed(let reason) = state else {
+        guard case .failed(let reason, let retry) = state else {
             Issue.record("Expected .failed prompting for setup-token"); return
         }
         #expect(reason.contains("setup-token"))
+        // Nothing to poll for — only the user adding a token changes this.
+        #expect(retry == .userAction)
     }
 
     @Test("Signed out reads as not-configured, never as an error")

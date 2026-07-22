@@ -51,12 +51,12 @@ struct CodexUsageSource: UsageSource {
         }
 
         guard let newest else {
-            return .failed(reason: "No usage data in recent Codex sessions yet")
+            return .failed(reason: "No usage data in recent Codex sessions yet", retry: .normal)
         }
 
         let windows = newest.limits.windows(for: provider)
         guard !windows.isEmpty else {
-            return .failed(reason: "Codex reported no rate-limit windows")
+            return .failed(reason: "Codex reported no rate-limit windows", retry: .normal)
         }
 
         return .ready(UsageSnapshot(

@@ -102,7 +102,9 @@ struct UsagePane: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Button("Refresh") { Task { await model.refresh() } }
+            // retryNow, not refresh: an explicit click is the user action
+            // that clears a back-off.
+            Button("Refresh") { Task { await model.retryNow() } }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
 
@@ -178,7 +180,7 @@ private struct UnavailableRow: View {
         switch state {
         case .loading: "checking…"
         case .notConfigured: "not set up on this Mac"
-        case .failed(let reason): reason
+        case .failed(let reason, _): reason
         case .ready: ""
         }
     }
