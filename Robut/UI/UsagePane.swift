@@ -17,6 +17,27 @@ struct UsagePane: View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
+            if showingClaudeSetup {
+                // Inline, NOT a sheet — a sheet takes key focus, which
+                // makes the menubar panel resign and close. See
+                // ClaudeSetupView.
+                Divider()
+                ClaudeSetupView(model: model) { showingClaudeSetup = false }
+            } else {
+                usageContent
+            }
+
+            Divider()
+            footer
+        }
+        .frame(width: 300)
+        .onReceive(tick) { now = $0 }
+        .task { await model.refresh() }
+    }
+
+    @ViewBuilder
+    private var usageContent: some View {
+        Group {
             if model.allWindows.isEmpty {
                 empty
             } else {
@@ -49,15 +70,6 @@ struct UsagePane: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
             }
-
-            Divider()
-            footer
-        }
-        .frame(width: 300)
-        .onReceive(tick) { now = $0 }
-        .task { await model.refresh() }
-        .sheet(isPresented: $showingClaudeSetup) {
-            ClaudeTokenSheet(model: model)
         }
     }
 

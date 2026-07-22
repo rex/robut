@@ -30,6 +30,23 @@ version bumps).
 
 ---
 
+## [0.6.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Fixed
+- **Clicking the token field made the whole UI disappear.** The setup UI
+  was a `.sheet`, and `MenuBarExtra(.window)` is an NSPanel that closes
+  the instant it resigns key — so the sheet taking focus closed the panel
+  and took the sheet with it. Compounded by `LSUIElement`: Robut isn't an
+  active app and can't readily take keyboard focus for a sheet at all.
+  Setup is now rendered **inline** in the pane.
+
+### Changed
+- Token entry's primary action is now **"Paste token from clipboard"** —
+  one click, no text-field focus required, which is the right shape for a
+  menubar panel regardless of the sheet bug. Typing is still available
+  behind a disclosure, and the entry is sanity-checked (length, no
+  embedded whitespace) without guessing at a token prefix that may change.
+- `ClaudeTokenSheet` renamed to `ClaudeSetupView` to match what it is.
+
 ## [0.5.1] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Changed
 - `TASK_STATE.md`: Phase 2 marked in-progress — Claude is built and unit
