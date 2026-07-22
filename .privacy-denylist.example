@@ -1,0 +1,18 @@
+# .privacy-denylist.example
+#
+# Copy to `.privacy-denylist.local` (which is gitignored) and fill in the
+# exact strings that must never appear in this public repository.
+#
+# One case-insensitive literal per line. Blank lines and #-comments ignored.
+# The pre-commit privacy gate matches these against staged content and
+# reports only the rule number — never the matched value.
+#
+# `make privacy-init` generates a starter file automatically.
+#
+# Typical entries:
+#
+#   Your Full Legal Name
+#   you@example.com
+#   ABCDE12345            (Apple Developer Team ID)
+#   your-macos-username
+#   00000000-0000-0000-0000-000000000000   (provider account UUID)

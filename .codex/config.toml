@@ -1,0 +1,21 @@
+# Codex CLI project config.
+# AGENTS.md is the canonical source of truth (shared across Claude Code,
+# Codex, Gemini, and Cursor). This file configures Codex-specific behavior
+# only.
+
+# Treat these filenames as project-doc fallbacks if AGENTS.md is missing.
+project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md", "README.md"]
+
+# Respect subdirectory AGENTS.md — nearest wins.
+nested_agents_md = true
+
+# Default model (override per-session with --model).
+default_model = "sonnet"
+
+# Tool allowlist for automated sessions.
+[tools]
+allowed = [
+  "read", "write", "edit",
+  "grep", "glob", "fd",
+  "bash",
+]

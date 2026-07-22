@@ -1,0 +1,9 @@
+{
+  "contextFiles": ["AGENTS.md", "CONVENTIONS.md"],
+  "subdirectoryContextFiles": true,
+  "defaultModel": "gemini-2.5-pro",
+  "tools": {
+    "allowed": ["read", "write", "edit", "grep", "glob", "bash"]
+  },
+  "comment": "AGENTS.md is the cross-tool canonical doc. GEMINI.md should be a symlink to AGENTS.md; we reference AGENTS.md directly here instead of relying on the symlink."
+}
