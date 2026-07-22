@@ -30,6 +30,21 @@ version bumps).
 
 ---
 
+## [0.8.1] — 2026-07-22 — Agent: Claude Opus 4.8
+### Changed
+- **Print-mode CLI usage confirmed NOT viable.** `claude -p "/usage"
+  --output-format json` does not run the slash command: it returns
+  `num_turns: 0` and a `result` containing Claude Code's end-of-session
+  cost summary. `/usage` appears to be interactive-only, and print mode
+  runs a zero-turn session rather than refusing — which is why it looked
+  plausible until tried. Recorded at the top of `ClaudeCLIUsageSource`.
+
+### Added
+- Regression test pinning the real cost-summary output to **zero**
+  windows. That text contains the word "Usage" and many numbers, so a
+  looser parser would report 0% used across the board — a confident lie
+  about remaining quota, which is worse than reporting nothing. 62 tests.
+
 ## [0.8.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Added
 - **`ClaudeCLIUsageSource`** — Claude usage with no credential in Robut

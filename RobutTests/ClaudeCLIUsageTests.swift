@@ -82,6 +82,27 @@ struct ClaudeUsageTextParserTests {
     func garbage() {
         #expect(ClaudeUsageTextParser.windows(from: "Welcome to Claude Code!", now: t0).isEmpty)
     }
+
+    @Test("Print mode's cost summary is not mistaken for usage limits")
+    func printModeCostSummaryIsNotUsage() {
+        // VERBATIM `result` from `claude -p "/usage" --output-format json`
+        // on a real machine. The envelope reported num_turns: 0 — the
+        // slash command never ran, and this is just Claude Code's
+        // end-of-session cost summary.
+        //
+        // The trap: it contains the word "Usage" and plenty of numbers.
+        // A looser parser would happily report 0% used across the board,
+        // which is far worse than reporting nothing — it's a confident
+        // lie about how much quota is left.
+        let costSummary = """
+        Total cost:            $0.0000
+        Total duration (API):  0s
+        Total duration (wall): 0s
+        Total code changes:    0 lines added, 0 lines removed
+        Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+        """
+        #expect(ClaudeUsageTextParser.windows(from: costSummary, now: t0).isEmpty)
+    }
 }
 
 /// Thread-safe "did this run?" flag — the runner closure is `@Sendable`,

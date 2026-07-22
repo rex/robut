@@ -1,8 +1,29 @@
 // ClaudeCLIUsageSource.swift — Claude usage via the CLI, no token at all.
 //
-// Runs `claude -p "/usage" --output-format json`. Claude Code reads its
-// OWN keychain item, so the read is silent — the prompt only ever
-// happens when a *different* app reads that item, which Robut never does.
+// ⛔️ STATUS: NOT VIABLE AS WRITTEN — verified 2026-07-22.
+//
+// `claude -p "/usage" --output-format json` does NOT run the slash
+// command. It returns `num_turns: 0`, `duration_api_ms: 0`, and a
+// `result` containing Claude Code's end-of-session cost summary:
+//
+//     Total cost:            $0.0000
+//     Total duration (API):  0s
+//     …
+//     Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+//
+// `/usage` appears to be interactive-only. Print mode silently runs a
+// zero-turn session instead of refusing, which is why this looked
+// plausible until it was actually tried.
+//
+// Do NOT "fix" this by loosening ClaudeUsageTextParser to read that
+// summary — it would report 0% used across the board, which is a
+// confident lie about remaining quota. There's a regression test.
+//
+// Getting usage from the CLI would mean driving the interactive TUI
+// through a pseudo-terminal and stripping ANSI, which is a different and
+// much larger piece of work. The machinery below (process spawning,
+// timeout watchdog, JSON envelope unwrapping, composite arbitration) all
+// stays correct and is reusable if that path is ever taken.
 //
 // Trade-offs vs. the token path (ClaudeUsageSource):
 //   + No credential in Robut, nothing to expire, nothing to paste.
