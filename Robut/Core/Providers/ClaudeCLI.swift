@@ -61,6 +61,50 @@ enum ClaudeCLI {
         let subscriptionType: String?
     }
 
+    // MARK: - Usage
+
+    /// Raw output of `claude -p "/usage" --output-format json`.
+    ///
+    /// Runs in a temp directory so the probe picks up no project context,
+    /// no CLAUDE.md, and no repo-specific config — this should be a
+    /// question about the account, not about wherever Robut happens to
+    /// have been launched from.
+    static func usageOutput(timeout: TimeInterval = 45) async -> String? {
+        guard let executable = executableURL() else { return nil }
+        return await run(
+            executable,
+            arguments: ["-p", "/usage", "--output-format", "json"],
+            timeout: timeout,
+            workingDirectory: scratchDirectory()
+        )
+    }
+
+    /// `--output-format json` wraps everything in a result envelope. Pull
+    /// out the human-readable text; fall back to the raw string if the
+    /// envelope shape isn't what we expect.
+    static func resultText(fromJSONEnvelope output: String) -> String? {
+        struct Envelope: Decodable {
+            let result: String?
+            let isError: Bool?
+            enum CodingKeys: String, CodingKey {
+                case result
+                case isError = "is_error"
+            }
+        }
+        guard let data = output.data(using: .utf8),
+              let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              let result = envelope.result
+        else { return nil }
+        return result
+    }
+
+    private static func scratchDirectory() -> URL {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "robut-claude-probe", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
     // MARK: - Process
 
     /// Run a short-lived command, returning stdout. Kills it on timeout so
@@ -68,11 +112,13 @@ enum ClaudeCLI {
     private static func run(
         _ executable: URL,
         arguments: [String],
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        workingDirectory: URL? = nil
     ) async -> String? {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        if let workingDirectory { process.currentDirectoryURL = workingDirectory }
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice

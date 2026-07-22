@@ -504,6 +504,20 @@ help-stack:
 
 # ─── Privacy (PUBLIC REPO — inviolable) ───────────────────────────────
 
+## claude-probe: Capture ONE real sample of `claude /usage` output
+#  Makes exactly one call, so it can't cause a retry storm. The output
+#  goes to your terminal only — review it before sharing; it may name
+#  your plan. ClaudeUsageTextParser is written against this shape.
+claude-probe:
+	@echo "$(CYAN)Running one `claude -p /usage` probe...$(RESET)"
+	@echo "$(YELLOW)This makes a single call. Review the output before sharing.$(RESET)"
+	@echo ""
+	@cd "$$TMPDIR" && claude -p "/usage" --output-format json 2>&1 || true
+	@echo ""
+	@echo "$(CYAN)---$(RESET)"
+	@echo "If that printed usage numbers, the CLI fallback can work."
+	@echo "Share the SHAPE (labels + where percentages sit) to fix the parser."
+
 ## privacy: Scan the worktree for personal data (blocking gate)
 privacy:
 	@scripts/check-privacy.sh --all

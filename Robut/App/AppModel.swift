@@ -44,8 +44,9 @@ final class AppModel {
 
     init(sources: [any UsageSource]? = nil, history: UsageHistoryStore = UsageHistoryStore()) {
         // v1 tracks Codex (zero-auth, read from local session files) and
-        // Claude (Robut's own token, in Robut's own keychain item).
-        self.sources = sources ?? [CodexUsageSource(), ClaudeUsageSource()]
+        // Claude (Robut's own token, falling back to the CLI when there
+        // isn't a usable one — see ClaudeCompositeSource).
+        self.sources = sources ?? [CodexUsageSource(), ClaudeCompositeSource()]
         self.history = history
         for source in self.sources { states[source.provider] = .loading }
     }

@@ -30,6 +30,36 @@ version bumps).
 
 ---
 
+## [0.8.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Added
+- **`ClaudeCLIUsageSource`** — Claude usage with no credential in Robut
+  at all. Runs `claude -p "/usage" --output-format json`; Claude Code
+  reads its OWN keychain item, so the read is silent. Slower (spawns a
+  CLI) and the output format isn't a contract, which is why it's the
+  fallback rather than the primary.
+- **`ClaudeCompositeSource`** — prefers the token path, falls back to the
+  CLI **only** when the token path structurally cannot work (absent or
+  rejected credential). It deliberately does NOT fall back on a rate
+  limit or server error: the CLI hits the same endpoint, so spawning it
+  during a 429 would be a second way to make the problem worse. There's a
+  test asserting the CLI is never even invoked while rate limited.
+- **`ClaudeUsageTextParser`** — pure text → windows, isolated so that the
+  one genuinely uncertain part of this feature lives in a single file.
+  Classifies session / weekly / Opus lines, reads percentages, and
+  converts relative reset times. Refuses to fabricate: a line without a
+  percentage yields no window, and an unparseable reset returns nil
+  rather than a guessed timezone.
+- `make claude-probe` — captures ONE real sample of the CLI's usage
+  output. Exactly one call, so it cannot cause a retry storm.
+- 13 tests for the fallback and parser; 61 across 9 suites total.
+
+### Note
+- The text parser is **provisional**: it was written without a real
+  sample, because verifying it meant calling an endpoint that had just
+  rate-limited the machine. Its invariants (never fabricate, never fall
+  back while rate limited) are tested and will hold; the exact wording
+  cases will need revising once `make claude-probe` produces real output.
+
 ## [0.7.1] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Fixed
 - **SwiftLint was never actually gating commits.** `make lint` ran it, but
