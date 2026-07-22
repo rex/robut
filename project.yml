@@ -1,0 +1,88 @@
+# project.yml — xcodegen manifest. SOURCE OF TRUTH for Robut.xcodeproj.
+#
+# The .xcodeproj is generated, never committed. Run `make regenerate`
+# after editing this file.
+
+name: Robut
+
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: '14.0'
+  groupSortPosition: top
+
+settingGroups:
+  common:
+    SWIFT_VERSION: '6.0'
+    # Swift 6 strict concurrency is the whole point of picking Swift 6.
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: 'YES'
+    # Placeholders; `make build` injects real values.
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    # Warnings are signal. Treat the dangerous ones as errors.
+    GCC_TREAT_WARNINGS_AS_ERRORS: 'NO'
+    CLANG_WARN_DOCUMENTATION_COMMENTS: 'YES'
+    DEAD_CODE_STRIPPING: 'YES'
+
+# Signing lives in an xcconfig that OPTIONALLY includes Local.xcconfig
+# (gitignored). This keeps the Developer ID + team ID — personal data —
+# out of a public repo, while still letting a fresh clone build
+# ad-hoc-signed with no setup. See Config/Signing.xcconfig.
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
+targets:
+  # ============================================================
+  # Robut — the menubar app. LSUIElement, so no Dock icon.
+  # ============================================================
+  Robut:
+    type: application
+    platform: macOS
+    deploymentTarget: '14.0'
+    sources:
+      - path: Robut
+        excludes:
+          - "**/AGENTS.md"
+          - "**/README.md"
+          - "**/.DS_Store"
+      - path: Robut/PrivacyInfo.xcprivacy
+        type: file
+    settings:
+      groups: [common]
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.robut.app
+        PRODUCT_NAME: Robut
+        INFOPLIST_FILE: Robut/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Robut/Robut.entitlements
+        LSAPPLICATIONCATEGORYTYPE: public.app-category.developer-tools
+        # Required for Developer ID notarization.
+        ENABLE_HARDENED_RUNTIME: 'YES'
+        # App Sandbox is deliberately ABSENT — see Robut.entitlements.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_USER_SCRIPT_SANDBOXING: 'NO'
+        COMBINE_HIDPI_IMAGES: 'YES'
+    scheme:
+      testTargets:
+        - RobutTests
+      gatherCoverageData: true
+
+  # ============================================================
+  # RobutTests — Swift Testing. The pace engine is the priority.
+  # ============================================================
+  RobutTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: '14.0'
+    sources:
+      - path: RobutTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: Robut
+    settings:
+      groups: [common]
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.robut.app.tests
+        GENERATE_INFOPLIST_FILE: 'YES'

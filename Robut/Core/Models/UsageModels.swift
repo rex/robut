@@ -1,0 +1,124 @@
+// UsageModels.swift — the value types every provider normalizes into.
+//
+// Deliberately dumb: no I/O, no dates-from-now, no formatting. Providers
+// produce these; the pace engine consumes them; the UI renders them.
+
+import Foundation
+
+/// A provider Robut tracks. v1 is intentionally two — scope restraint is
+/// a feature, not an omission.
+enum Provider: String, CaseIterable, Sendable, Identifiable, Codable {
+    case claude
+    case codex
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .claude: "Claude"
+        case .codex: "Codex"
+        }
+    }
+}
+
+/// One rate-limit window: "the weekly quota", "the 5-hour session quota".
+///
+/// Providers disagree about naming (Codex says primary/secondary, Claude
+/// says session/weekly) and the same slot can change meaning between
+/// releases. So `kind` is derived from the window's *length*, which is
+/// the thing that actually stays stable.
+struct UsageWindow: Sendable, Hashable, Identifiable, Codable {
+    enum Kind: Sendable, Hashable, Codable {
+        /// Short rolling window — Claude's 5-hour session, and friends.
+        case session
+        /// Seven-day window.
+        case weekly
+        /// Anything else, carried so we can still label it honestly.
+        case other(minutes: Int)
+
+        /// Derive from window length. Boundaries are generous because
+        /// providers round (10080 min = exactly 7d, but 5h shows up as
+        /// 300 and sometimes 299).
+        init(windowMinutes: Int) {
+            switch windowMinutes {
+            case ..<1: self = .other(minutes: windowMinutes)
+            case 1...(60 * 8): self = .session
+            case (60 * 24 * 6)...(60 * 24 * 8): self = .weekly
+            default: self = .other(minutes: windowMinutes)
+            }
+        }
+
+        var slug: String {
+            switch self {
+            case .session: "session"
+            case .weekly: "weekly"
+            case .other(let minutes): "other-\(minutes)"
+            }
+        }
+
+        /// Sort key so the pane lists short windows above long ones.
+        var order: Int {
+            switch self {
+            case .session: 0
+            case .other: 1
+            case .weekly: 2
+            }
+        }
+    }
+
+    let provider: Provider
+    let kind: Kind
+    /// 0...1. Providers report percent; normalize at the boundary.
+    let usedFraction: Double
+    let resetsAt: Date
+    /// Full length of the window, used to compute how far into it we are.
+    let length: TimeInterval
+
+    /// Stable across refreshes — this is the key history is bucketed by.
+    var id: String { "\(provider.rawValue).\(kind.slug)" }
+
+    var label: String {
+        switch kind {
+        case .session: "Session"
+        case .weekly: "Weekly"
+        case .other(let minutes) where minutes % (60 * 24) == 0: "\(minutes / (60 * 24))-day"
+        case .other(let minutes) where minutes % 60 == 0: "\(minutes / 60)-hour"
+        case .other(let minutes): "\(minutes)-minute"
+        }
+    }
+
+    var remainingFraction: Double { max(0, 1 - usedFraction) }
+
+    /// When this window began, inferred from its reset time and length.
+    var startedAt: Date { resetsAt.addingTimeInterval(-length) }
+}
+
+/// One provider's complete state at one moment.
+struct UsageSnapshot: Sendable, Hashable, Identifiable, Codable {
+    let provider: Provider
+    let windows: [UsageWindow]
+    let sampledAt: Date
+    /// Plan name if the provider volunteers one ("plus", "max"). Display
+    /// only — never used for logic, since the strings are not stable.
+    let planLabel: String?
+
+    var id: String { provider.rawValue }
+}
+
+/// What Robut knows about a provider right now, including the ways it can
+/// fail. Failure is a first-class state: a provider that can't be read
+/// shows a muted row and never interrupts the user.
+enum ProviderState: Sendable {
+    case loading
+    case ready(UsageSnapshot)
+    /// Provider isn't set up on this machine at all (no ~/.codex, not
+    /// signed in). Not an error — just nothing to show.
+    case notConfigured
+    /// Configured but the read failed. Carries a short human reason.
+    case failed(reason: String)
+
+    var snapshot: UsageSnapshot? {
+        if case .ready(let snapshot) = self { return snapshot }
+        return nil
+    }
+}

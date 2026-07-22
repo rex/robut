@@ -1,0 +1,29 @@
+// Signing.xcconfig — committed defaults + optional local override.
+//
+// PUBLIC REPO: a Developer ID name and Team ID are personal data and must
+// never be committed. They live in Local.xcconfig, which is gitignored.
+//
+// The `#include?` below is an OPTIONAL include: if Local.xcconfig is
+// absent (fresh clone, CI, a contributor's machine) the build still
+// works — it just produces an ad-hoc-signed app that runs locally but
+// cannot be notarized or distributed.
+//
+// To sign for real, create Local.xcconfig at the repo root:
+//
+//     CODE_SIGN_IDENTITY = <your Developer ID Application certificate>
+//     DEVELOPMENT_TEAM   = <your 10-character team id>
+//     CODE_SIGN_STYLE    = Manual
+//
+// (Written with placeholders on purpose — spelling a real identity here,
+// even as an example, trips the privacy gate. That is the gate working.)
+//
+// `make signing-init` writes it for you from the Developer ID already
+// installed in your keychain.
+
+// ── Defaults: ad-hoc signing, no team. Overridden by Local.xcconfig. ──
+CODE_SIGN_IDENTITY = -
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM =
+
+// Values below this line win. Keep it last.
+#include? "../Local.xcconfig"

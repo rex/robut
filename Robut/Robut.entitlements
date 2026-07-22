@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      App Sandbox is DELIBERATELY ABSENT.
+
+      Robut must read ~/.codex/sessions and ~/.claude, and spawn the
+      `claude` CLI. The sandbox forbids both, and there is no entitlement
+      that grants read access to another tool's dot-directory without a
+      user-selected file prompt for each one — which is precisely the
+      "stop nagging me" problem this app exists to solve.
+
+      This is fine for Developer ID + notarization: Apple requires the
+      HARDENED RUNTIME for notarization, not the App Sandbox. Only the
+      Mac App Store requires the sandbox, and Robut is not shipping there.
+
+      Do not "fix" this by adding com.apple.security.app-sandbox.
+      It will silently break every provider.
+    -->
+
+    <!-- Outbound HTTPS to provider usage endpoints. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+</dict>
+</plist>

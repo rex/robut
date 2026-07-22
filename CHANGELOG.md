@@ -30,6 +30,49 @@ version bumps).
 
 ---
 
+## [0.2.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Added
+- **The app.** Robut now builds, launches into the menubar, and reports
+  real Codex usage. macOS 14+, Swift 6 strict concurrency, SwiftUI
+  `MenuBarExtra` with `LSUIElement` (no Dock icon).
+- **`PaceEngine`** — the projection engine the app exists for. Estimates
+  burn rate by least-squares fit over recent samples (resistant to a
+  single spike near the end, unlike last-minus-first), then projects it
+  against the reset deadline to answer "do I make it?". Verdicts:
+  exhausted / unknown / idle / comfortable / tight / shortfall, each
+  carrying the pace ratio, projected exhaustion, and headroom or
+  shortfall. Pure and clock-injected, therefore fully testable.
+- **`CodexUsageSource`** — Codex usage with zero credentials, read from
+  the `rate_limits` payloads Codex already writes to
+  `~/.codex/sessions/**/*.jsonl`. No token, no keychain, no network, so
+  nothing that can ever prompt.
+- **`UsageHistoryStore`** — append-only JSONL sample history in
+  Application Support, bucketed by window, pruned at 14 days. Records
+  only on change plus a quiet-period heartbeat, so an idle machine
+  doesn't bloat the log or flat-line the regression.
+- **Robot face menubar icon** — 8×8 pixel art whose colour and
+  expression track the worst-case pace across every window (calm green /
+  squinting amber / alarmed red / dim when unknown).
+- **Usage pane** — one screenful, worst-pace window first, each row
+  leading with the verdict sentence rather than a raw percentage.
+  Providers that can't be read render as muted rows, never as dialogs.
+- 23 tests across 4 suites, covering burn-rate estimation, window
+  rollover (a reset must not read as "idle"), every verdict branch, and
+  window classification. Fixtures are synthetic; `now` is always injected.
+
+### Changed
+- `VIBE.yaml::architecture.exclude_globs` now skips `DerivedData/`,
+  `*.xcodeproj/`, and `build/` — Xcode's generated bridging headers are
+  not source anyone maintains.
+- Privacy gate `--all` now enumerates tracked *and* untracked files and
+  fails when it scans zero, instead of reporting a vacuous pass before
+  the first commit. History mode scans commit messages and paths only,
+  not author identity.
+
+### Fixed
+- Swift 6 data race: a shared `ISO8601DateFormatter` static is
+  non-Sendable. Replaced with value-type `Date.ISO8601FormatStyle`.
+
 ## [0.1.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Added
 - Initial project scaffold from `agentic-skeleton` + `lang-swift-apple`.

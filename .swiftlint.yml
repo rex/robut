@@ -1,0 +1,88 @@
+# SwiftLint — enforced via `make lint` and the pre-commit hook.
+#
+# Style rules live here, not in AGENTS.md. VIBE.yaml owns the hard
+# architecture limits (file length, module shape); this file owns idiom.
+
+included:
+  - Robut
+  - RobutTests
+
+excluded:
+  - DerivedData
+  - .build
+  - Robut/Generated
+
+disabled_rules:
+  # SwiftUI view bodies are legitimately deep; nesting depth here is
+  # structure, not complexity.
+  - nesting
+  # Trailing commas are a diff-noise preference, not a correctness one.
+  - trailing_comma
+
+opt_in_rules:
+  - array_init
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_first_not_nil
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - last_where
+  - literal_expression_end_indentation
+  - modifier_order
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_type_over_type_of_self
+  - redundant_nil_coalescing
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+line_length:
+  warning: 110
+  error: 140
+  ignores_comments: false
+  ignores_urls: true
+
+# Mirrors VIBE.yaml::architecture.max_lines_per_file (soft 250 / hard 400).
+file_length:
+  warning: 250
+  error: 400
+
+type_body_length:
+  warning: 200
+  error: 320
+
+function_body_length:
+  warning: 50
+  error: 80
+
+cyclomatic_complexity:
+  warning: 12
+  error: 20
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  excluded: [id, at, to, up, x, y]
+
+type_name:
+  min_length: 3
+
+# Force-unwrapping in app code is how you ship a crash. Tests may.
+force_unwrapping:
+  severity: error
+
+force_cast:
+  severity: error
+
+force_try:
+  severity: error
+
+reporter: "xcode"

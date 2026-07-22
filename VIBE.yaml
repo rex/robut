@@ -77,6 +77,11 @@ architecture:
   exclude_globs:
     - "**/*.generated.*"
     - "**/node_modules/**"
+    # Xcode build output — compiler-generated bridging headers routinely
+    # blow the line limit and are not source anyone maintains.
+    - "DerivedData/**"
+    - "**/*.xcodeproj/**"
+    - "build/**"
   max_lines_per_file:
     soft: 250    # warning only — refactor trigger
     hard: 400    # blocking failure
