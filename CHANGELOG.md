@@ -30,6 +30,27 @@ version bumps).
 
 ---
 
+## [0.3.0] — 2026-07-22 — Agent: Claude Opus 4.8
+### Added
+- **History backfill.** `UsageSource.backfill()` seeds pace history from
+  data the provider already logged locally, so a fresh install answers
+  "will I make it?" on first launch instead of reporting "measuring
+  pace" for hours — which is exactly the moment someone installs Robut
+  wanting an answer. Codex implements it by replaying every historical
+  `rate_limits` payload; against a real machine this seeded 1,528
+  samples spanning 273 hours. Default implementation returns nothing,
+  so providers that can't reconstruct history simply opt out.
+- Codex source test suite with synthetic fixtures: latest-payload
+  selection, primary + secondary windows, percentage clamping,
+  tolerance of malformed lines, and backfill ordering. 29 tests total.
+
+### Fixed
+- **The app never actually polled.** Startup was kicked off from a
+  `.task` on the `MenuBarExtra` label, which never fires — the label
+  backs an `NSStatusItem` rather than appearing in a normal view
+  hierarchy. The symptom was an icon that rendered perfectly and a
+  history file that stayed empty. Startup now runs from `RobutApp.init`.
+
 ## [0.2.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Added
 - **The app.** Robut now builds, launches into the menubar, and reports

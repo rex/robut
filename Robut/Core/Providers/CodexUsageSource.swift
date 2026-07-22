@@ -69,8 +69,8 @@ struct CodexUsageSource: UsageSource {
 
     // MARK: - File discovery
 
-    /// Newest-first rollout files, capped at `filesToScan`.
-    private func recentRolloutFiles() -> [URL] {
+    /// Newest-first rollout files, capped at `limit` (default `filesToScan`).
+    private func recentRolloutFiles(limit: Int? = nil) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
         guard let walker = FileManager.default.enumerator(
             at: sessionsRoot,
@@ -87,31 +87,72 @@ struct CodexUsageSource: UsageSource {
 
         return candidates
             .sorted { $0.modified > $1.modified }
-            .prefix(filesToScan)
+            .prefix(limit ?? filesToScan)
             .map(\.url)
     }
 
     /// Last `rate_limits` payload in a rollout file.
-    ///
-    /// Scans forward keeping the last match rather than reading backward:
-    /// rollout files are modest, and a cheap `contains` check skips the
-    /// ~99% of lines that are message content before any JSON parsing.
     private func lastRateLimits(in file: URL) -> (at: Date, limits: RateLimits)? {
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        allRateLimits(in: file).last
+    }
+
+    /// Every `rate_limits` payload in a rollout file, oldest first.
+    ///
+    /// Scans forward rather than reading backward: rollout files are
+    /// modest, and a cheap `contains` check skips the ~99% of lines that
+    /// are message content before any JSON parsing happens.
+    private func allRateLimits(in file: URL) -> [(at: Date, limits: RateLimits)] {
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
 
         let decoder = JSONDecoder()
-        var result: (at: Date, limits: RateLimits)?
+        var found: [(at: Date, limits: RateLimits)] = []
 
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             guard line.contains("rate_limits") else { continue }
             guard let data = line.data(using: .utf8),
                   let entry = try? decoder.decode(RolloutEntry.self, from: data),
                   let limits = entry.payload?.rateLimits,
-                  limits.hasAnyWindow
+                  limits.hasAnyWindow,
+                  let at = entry.parsedTimestamp
             else { continue }
-            result = (entry.parsedTimestamp ?? Date.distantPast, limits)
+            found.append((at, limits))
         }
-        return result
+        return found
+    }
+
+    // MARK: - Backfill
+
+    /// Historical snapshots reconstructed from past rollout files, oldest
+    /// first.
+    ///
+    /// Without this, a fresh install has one sample and honestly reports
+    /// "measuring pace" for hours — which is exactly the moment someone
+    /// installs Robut wanting an answer. Codex has been recording its own
+    /// rate limits all along, so seed the history from that instead of
+    /// making the user wait for it to accumulate.
+    func backfill() async -> [UsageSnapshot] {
+        historicalSnapshots(limitFiles: 40)
+    }
+
+    private func historicalSnapshots(limitFiles: Int) -> [UsageSnapshot] {
+        guard FileManager.default.fileExists(atPath: sessionsRoot.path(percentEncoded: false)) else {
+            return []
+        }
+
+        var snapshots: [UsageSnapshot] = []
+        for file in recentRolloutFiles(limit: limitFiles) {
+            for entry in allRateLimits(in: file) {
+                let windows = entry.limits.windows(for: provider)
+                guard !windows.isEmpty else { continue }
+                snapshots.append(UsageSnapshot(
+                    provider: provider,
+                    windows: windows,
+                    sampledAt: entry.at,
+                    planLabel: entry.limits.planType
+                ))
+            }
+        }
+        return snapshots.sorted { $0.sampledAt < $1.sampledAt }
     }
 }
 

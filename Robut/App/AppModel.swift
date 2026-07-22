@@ -23,6 +23,7 @@ final class AppModel {
     private let sources: [any UsageSource]
     private let history: UsageHistoryStore
     private var ticker: Task<Void, Never>?
+    private var didSeedHistory = false
 
     init(sources: [any UsageSource]? = nil, history: UsageHistoryStore = UsageHistoryStore()) {
         // v1 tracks Codex (zero-auth, local) and Claude (own OAuth).
@@ -36,10 +37,31 @@ final class AppModel {
     func start() {
         guard ticker == nil else { return }
         ticker = Task { [weak self] in
+            await self?.seedHistory()
             while !Task.isCancelled {
                 await self?.refresh()
                 try? await Task.sleep(for: .seconds(Self.refreshInterval))
             }
+        }
+    }
+
+    /// Seed pace history from whatever the providers already logged
+    /// locally, so the first launch can answer the question rather than
+    /// spending hours accumulating samples first.
+    private func seedHistory() async {
+        guard !didSeedHistory else { return }
+        didSeedHistory = true
+
+        for source in sources {
+            let snapshots = await source.backfill()
+            guard !snapshots.isEmpty else { continue }
+            for snapshot in snapshots {
+                await history.record(snapshot)
+            }
+            let provider = source.provider.rawValue
+            Log.history.info(
+                "Seeded \(snapshots.count, privacy: .public) snapshot(s) for \(provider, privacy: .public)"
+            )
         }
     }
 
