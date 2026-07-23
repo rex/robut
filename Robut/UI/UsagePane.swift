@@ -153,7 +153,7 @@ private struct WindowRow: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(mood == .dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(mood.tint))
                 Spacer()
-                Text(PaceFormatting.resetText(window.resetsAt, now: now))
+                Text(PaceFormatting.resetText(for: window, now: now))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }

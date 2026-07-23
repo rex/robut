@@ -30,6 +30,18 @@ version bumps).
 
 ---
 
+## [0.13.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Changed
+- **Reset times are now styled by window length, matching the Claude Code
+  app.** The 5-hour session shows a relative countdown ("resets in 4h
+  27m"); the weekly shows an absolute day + time ("resets Thu 3:00 AM").
+  An absolute instant is far more actionable for something days out than
+  "resets in 6d 18h". Mirrors Claude Code's own `alwaysShowDateInReset`
+  (on for weekly, off for session). Uses a value-type `Date.FormatStyle`,
+  so it's locale-aware and safe under Swift 6 concurrency.
+- Verified Robut's numbers against the Claude Code app: 5-hour 2%, weekly
+  (all models) 5%, weekly Fable 0% — an exact match.
+
 ## [0.12.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Fixed
 - **The refresh loop wedged after system sleep — stuck spinner, "updated

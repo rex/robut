@@ -62,8 +62,26 @@ enum PaceFormatting {
         return "\(Int(value.rounded()))%"
     }
 
-    static func resetText(_ resetsAt: Date, now: Date) -> String {
-        let remaining = resetsAt.timeIntervalSince(now)
-        return remaining <= 0 ? "resetting…" : "resets in \(duration(remaining))"
+    /// Reset text, styled by window length — matching the Claude Code app,
+    /// whose usage panel shows the 5-hour limit as relative ("in 4 hr
+    /// 27 min") and the weekly as absolute ("Thu 3:00 AM"). A short
+    /// countdown is what you want for a session; an absolute day + time is
+    /// far more actionable for something days out than "resets in 6d 18h".
+    static func resetText(for window: UsageWindow, now: Date) -> String {
+        let remaining = window.resetsAt.timeIntervalSince(now)
+        guard remaining > 0 else { return "resetting…" }
+
+        switch window.kind {
+        case .session:
+            return "resets in \(duration(remaining))"
+        case .weekly, .other:
+            return "resets \(absoluteReset(window.resetsAt))"
+        }
+    }
+
+    /// e.g. "Thu 3:00 AM" — locale-aware, value-type formatter (safe under
+    /// Swift 6 concurrency, unlike a shared DateFormatter).
+    static func absoluteReset(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 }
