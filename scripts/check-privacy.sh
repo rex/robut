@@ -107,6 +107,24 @@ case "$MODE" in
     done <<<"$files"
     ;;
 
+  --message)
+    # Scan a commit MESSAGE file. This closes the gap that let a signing
+    # team id reach public history: the staged-content scan never sees the
+    # message being written. Wired as a commit-msg hook.
+    msg_file="${2:-}"
+    echo "→ privacy gate: scanning commit message"
+    if [[ -z "$msg_file" || ! -f "$msg_file" ]]; then
+      grn "✓ privacy gate: no message file"; exit 0
+    fi
+    # Ignore comment lines (git's scissors / status footer) and structured
+    # trailers. Co-Authored-By / Signed-off-by are metadata that legitimately
+    # carry a bot email (e.g. the required noreply@anthropic.com co-author);
+    # a personal email anywhere in the actual message body is still scanned.
+    msg_body="$(grep -v '^#' "$msg_file" 2>/dev/null \
+      | grep -viE '^[[:space:]]*(Co-Authored-By|Signed-off-by|Co-developed-by):' || true)"
+    scan_content "commit message" "$msg_body"
+    ;;
+
   --all)
     echo "→ privacy gate: scanning worktree"
     scanned=0
@@ -147,7 +165,7 @@ case "$MODE" in
     ;;
 
   *)
-    echo "usage: $0 [--all|--history]" >&2; exit 2 ;;
+    echo "usage: $0 [staged|--all|--history|--message <file>]" >&2; exit 2 ;;
 esac
 
 if [[ "$FAILED" -ne 0 ]]; then

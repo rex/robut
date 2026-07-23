@@ -589,7 +589,7 @@ privacy-history:
 hooks:
 	@command -v pre-commit >/dev/null 2>&1 || { \
 		echo "$(RED)  pre-commit missing — brew install pre-commit$(RESET)"; exit 1; }
-	@pre-commit install
-	@echo "$(GREEN)pre-commit hooks installed (privacy gate active).$(RESET)"
+	@pre-commit install --hook-type pre-commit --hook-type commit-msg
+	@echo "$(GREEN)pre-commit + commit-msg hooks installed (privacy gate active).$(RESET)"
 
 .DEFAULT_GOAL := help

@@ -30,6 +30,15 @@ version bumps).
 
 ---
 
+## [0.11.2] — 2026-07-23 — Agent: Claude Opus 4.8
+### Security
+- **The privacy gate now scans commit MESSAGES, not just file content.**
+  A signing team id reached a commit message (and thus public history)
+  because the staged-content scan never sees the message being written.
+  `check-privacy.sh --message` is now wired as a `commit-msg` hook, and
+  `make hooks` installs that stage. Verified it blocks a denylisted string
+  in a message and passes a clean one.
+
 ## [0.11.1] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Fixed
 - Tests and typecheck build with `CODE_SIGNING_ALLOWED=NO`, which re-signs

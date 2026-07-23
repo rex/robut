@@ -57,6 +57,14 @@ repos:
         language: script
         pass_filenames: false
         always_run: true
+      # Also scan the commit MESSAGE — the staged-content scan never sees
+      # it, which is how a signing team id once reached public history.
+      - id: check-privacy-message
+        name: privacy gate — commit message
+        entry: scripts/check-privacy.sh --message
+        language: script
+        stages: [commit-msg]
+        always_run: true
       # SwiftLint — this repo's actual linter. Without it here, `make
       # lint` was advisory only and a violation could sail into a commit.
       - id: swiftlint
