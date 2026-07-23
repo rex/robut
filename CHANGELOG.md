@@ -30,6 +30,14 @@ version bumps).
 
 ---
 
+## [0.18.1] — 2026-07-23 — Agent: Claude Opus 4.8
+### Changed
+- Refreshed `TASK_STATE.md` and `PROGRESS.md` for context compaction: §0
+  reflects v0.18.0 (design system + two-regime pace engine + stats
+  capture all shipped), phases table updated, fresh §6 handoff (the stats
+  DISPLAY is next, gated on Claude Design working from
+  `docs/stats-matrix.md`), stale v0.16.0 handoff removed.
+
 ## [0.18.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Added
 - **The statistics capture layer (`Core/Stats/`)** — Robut now captures

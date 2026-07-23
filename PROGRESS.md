@@ -8,7 +8,8 @@
 - **Active branch**: `main`
 - **Version**: v0.18.0 — statistics capture layer; all gates green (84 tests).
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
-- **Last session**: 2026-07-23 (Claude Opus 4.8). Stats capture + matrix.
+- **Last session**: 2026-07-23 (Claude Opus 4.8). Ended by `/compact`.
+  Shipped design-system integration, pace forgiveness, stats capture.
 
 ## Current state (one line)
 
@@ -42,9 +43,11 @@ groups, SegmentMeters, an answer-first summary, and the per-bar pace marker.
 
 ## How to resume (for a fresh agent)
 
-1. Read `AGENTS.md` §1/§9, then `TASK_STATE.md` §0 + §5.
+1. Read `AGENTS.md` §1/§9, then `TASK_STATE.md` §0 + §6 (handoff) + §5.
 2. `make signing-init` (once per clone) then `make dev` to run it.
 3. `make test` / `make lint` / `make privacy` are the gates.
+4. Stats display work: read `docs/stats-matrix.md`, then sync Claude
+   Design's work via the DesignSync tool ("Robut Design System" project).
 
 ## Do NOT
 

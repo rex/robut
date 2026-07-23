@@ -11,10 +11,13 @@
 
 **Robut** — a macOS menubar app showing Claude + Codex usage with burn-rate
 projection ("will my current pace last until reset?"). It is **fully built,
-working, and running** (v0.16.0): Codex + Claude both show live usage with
-pace verdicts, in a pane **rebuilt to the Robut Design System** — `Theme`
-tokens, self-hosted Geist, provider groups, SegmentMeters, an answer-first
-summary headline, and the per-bar pace marker.
+working, and running** (v0.18.0): the pane is on the Robut Design System
+(`Theme` tokens, self-hosted Geist, provider groups, SegmentMeters + pace
+marker, answer-first summary), the pace engine is TWO regimes (lived-rate
+forgiveness for long windows — see §4), and a **statistics capture layer**
+(`Core/Stats/`) is live: token rollups, `/usage` analytics, prompt
+activity, plan/credits, price table, and tokens-per-percent quota
+estimates, all local + read-only, read via `model.stats.snapshot()`.
 
 **Architecture is settled:**
 - Codex usage: read from `~/.codex/sessions/**/*.jsonl` (on disk).
@@ -25,14 +28,16 @@ summary headline, and the per-bar pace marker.
 - The pace math lives in `Core/Pace/PaceEngine.swift` (pure, clock-injected,
   heavily tested — this is the product; treat it as load-bearing).
 
-**Current context:** Claude Design delivered the Robut Design System (the
-claude.ai design project, synced via the DesignSync tool) and it is now
-INTEGRATED — the `Theme` token layer, self-hosted Geist/Geist Mono, the
-component views, the rebuilt pane, and the pace marker all shipped in
-v0.16.0. Everything green (59 tests, lint, privacy, architecture).
+**Current context:** Claude Design is designing the STATS DISPLAY right
+now (handoff: `docs/stats-matrix.md`, pushed into the design project as
+`stats-matrix.md`; a standalone data-exploration window is on the table).
+The data side is done and flowing. Everything green (84 tests / 20
+suites, lint, privacy, architecture).
 
-**Next planned work:** distribution (Slice 5.1) and the confirmed low-usage
-`.shortfall` fix (§3). Nothing is mid-flight; safe to pause here.
+**Next planned work:** build the stats display once Claude Design's
+design lands (sync it via the DesignSync tool, same flow as the pane
+rebuild); then distribution (Slice 5.1). Nothing is mid-flight; safe to
+pause here.
 
 **Read `AGENTS.md` §1 and §9 before touching anything.** This is a **public
 repo** — no personal data, ever (`make privacy`; a commit-msg gate scans
@@ -67,6 +72,9 @@ keychain-prompt bug returns).
 | 2 | Claude provider (CLI) | ✅ done | Live Claude usage via `claude /usage`; all windows, correct resets |
 | 3 | Design system + pane rebuild | ✅ done | `Theme` + Geist; pane rebuilt to the DS kit (v0.16.0) |
 | 4 | Pace marker | ✅ done | Per-bar elapsed-fraction tick on the SegmentMeter |
+| 4.5 | Pace forgiveness | ✅ done | Two-regime engine: lived rate + evidence gate + prior weeks (v0.17.0) |
+| 4.7 | Stats capture | ✅ done | `Core/Stats/` ledger — tokens, insights, cost, quota estimates (v0.18.0) |
+| 4.8 | Stats display | 🟡 external | Claude Design designing from `docs/stats-matrix.md`; build after |
 | 5 | Distribution | ⏸ pending | Signed, notarized, Sparkle auto-update, published to Releases |
 | 6 | CI | ⏸ pending | `macos-latest` workflow: build + test + lint + privacy |
 
@@ -182,33 +190,46 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
    asset catalog for onboarding/marketing surfaces — fonts are already
    vendored, but the PNGs still live only in the design project.
 
-## 6. Handoff note (2026-07-23, v0.16.0)
+## 6. Handoff note (compaction, 2026-07-23, v0.18.0)
 
-**State:** Robut is fully built, running, and correct at **v0.16.0** —
-Codex (disk) + Claude (CLI) both live, in a pane rebuilt to the Robut Design
-System. Working tree committed + pushed, all gates green (59 tests / 10
-suites, lint, privacy, architecture, module-rules). Verified live: the pane
-renders correctly (provider groups, badges, SegmentMeters + pace marker,
-summary headline, glow wash), Geist loads, the menubar item has real width.
+**State:** Robut is fully built, running, and correct at **v0.18.0**.
+Working tree clean, all pushed, all gates green (84 tests / 20 suites,
+lint, privacy, architecture, module-rules). Three major slices shipped
+this session, all verified live:
 
-**What shipped this session (design-system integration):**
-- `Robut/UI/Theme/` — `ColorHex`, `Theme` (colour/metrics/radius/motion),
-  `Fonts` (Geist/Geist Mono via CoreText `wght` variation).
-- `Robut/UI/Components/` — `SegmentMeter` (+ pace marker), `StatusBadge`.
-- `Robut/UI/` — `PaneHeader`, `WindowRowView` (group/window/unavailable),
-  rebuilt `UsagePane`.
-- Model: `UsageWindow.elapsedFraction(now:)`, `PaceFormatting.summaryText` /
-  `badgeLabel`, `AppModel.providerGroups` / `worstWindow` / `summaryText`.
-- Fonts vendored at `Robut/Resources/Fonts/` (OFL), registered in
-  `AppDelegate`.
+1. **Design-system integration (v0.16.0)** — `Theme` tokens (status
+   colours sourced from `RobotMood.nsTint`), self-hosted Geist/Geist Mono
+   (CoreText `wght` axis), pane rebuilt to the DS kit, pace marker.
+2. **Two-regime pace engine (v0.17.0)** — <24h to reset: original sharp
+   engine; ≥24h: lived rate over ≤72h (`PacePattern.livedRate`, sleep in
+   the denominator) + prior-epoch peak learning (retention 35d) + red
+   gated on ≥24h evidence. Fixed the 7%-weekly false red — verified live
+   (robot went green on the same data). Glow wash now full-height.
+3. **Statistics capture (v0.18.0)** — `Core/Stats/`: cursor-incremental
+   scanners over both transcript stores, `/usage` analytics parser,
+   prompt activity, plan/credits, `PriceTable`, tokens-per-percent quota
+   correlator. First live scan captured months of history across both
+   providers and produced real quota estimates. Read model:
+   `await model.stats.snapshot()`.
 
-**Next:** (1) the CONFIRMED low-usage `.shortfall` fix (§3) — a `Core/Pace`
-change, failing test first; (2) Slice 5.1 distribution + app icon; (3) CI.
+**Now:** Claude Design is designing the STATS DISPLAY from
+`docs/stats-matrix.md` (also in the design project as `stats-matrix.md`;
+a standalone data-exploration window is under consideration). When their
+design lands, sync it with the DesignSync tool (list_projects →
+"Robut Design System" → read files) exactly like the pane rebuild, and
+build the display on `model.stats.snapshot()` + `PriceTable.cost(of:model:)`.
 
-**Traps not to re-introduce** (all in `AGENTS.md` §9): no keychain/OAuth/token
-dependency (Robut holds zero credentials); `make signing-init` before building;
-`MenuBarExtra` label can't use `.task`/`Canvas`/lazy-`NSImage` (only `RobotIcon`
-bitmap — the menubar item was verified 36×24, not zero-width); `make test` must
-not touch the network (guarded); never auto-retry an auth failure. And now: the
-four status colours have ONE home — `RobotMood.nsTint`; `Theme.status(_:)`
-surfaces them, so never retune them in `Theme`.
+**Watch items:** §3 — long-horizon verdicts over real days (windows read
+"Measuring pace…" until their id has 24h of lived history; tune
+`PaceEngine+LongHorizon` constants only against observed weeks).
+
+**Traps not to re-introduce** are ALL in `AGENTS.md` §9 — read it. The
+newest: the stats layer is read-only + cursor-incremental (never full
+rescans, never writes to provider dirs, guarded from `make test`); local
+tokens ≠ account usage; Claude tokens live in `usage.iterations`; Codex
+`token_count` is cumulative. Plus the standing ones: no keychain/OAuth
+(zero credentials), `make signing-init` before building, `MenuBarExtra`
+label limits, never auto-retry auth, status colours only in
+`RobotMood.nsTint`, pace engine is two regimes — don't unify.
+
+<!-- Older handoffs live in git history; §4 + CHANGELOG carry the facts. -->
