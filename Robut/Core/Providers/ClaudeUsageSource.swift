@@ -196,6 +196,7 @@ struct ClaudeUsageSource: UsageSource {
     // MARK: - Decoding
 
     private func decode(_ data: Data, now: Date) -> ProviderState {
+        logResponseShape(data)
         guard let payload = try? JSONDecoder().decode(UsagePayload.self, from: data) else {
             // Shape only — never the body, which is account data.
             let keys = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -215,5 +216,32 @@ struct ClaudeUsageSource: UsageSource {
             sampledAt: now,
             planLabel: nil
         ))
+    }
+
+    /// TEMPORARY diagnostic: log the response's STRUCTURE — top-level
+    /// keys, each window's sub-keys, and the raw value of any reset-ish
+    /// field — so the exact wire shape (which the reset field is, and its
+    /// format) can be read from one poll that's already happening, instead
+    /// of guessed. This response carries only usage numbers and reset
+    /// timestamps: no name, email, or account id. Remove once the shape
+    /// is pinned by a test.
+    private func logResponseShape(_ data: Data) {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return
+        }
+        var parts: [String] = []
+        for key in object.keys.sorted() {
+            guard let sub = object[key] as? [String: Any] else {
+                parts.append(key)
+                continue
+            }
+            let subkeys = sub.keys.sorted().joined(separator: ",")
+            let resets = sub
+                .filter { $0.key.lowercased().contains("reset") }
+                .map { "\($0.key)=\(String(describing: $0.value))" }
+                .joined(separator: ",")
+            parts.append("\(key){\(subkeys)}\(resets.isEmpty ? "" : "[\(resets)]")")
+        }
+        Log.providers.notice("claude usage shape: \(parts.joined(separator: " "), privacy: .public)")
     }
 }

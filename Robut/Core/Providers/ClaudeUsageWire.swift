@@ -2,27 +2,41 @@
 //
 // Split out of ClaudeUsageSource to keep that file within the
 // architecture line limit. Pure Decodable shapes; no behaviour.
+//
+// The window keys and their human labels were read from the Claude Code
+// binary, verbatim:
+//   five_hour                  → "session limit"
+//   seven_day                  → "weekly limit"     (all models)
+//   seven_day_opus             → "Opus limit"
+//   seven_day_sonnet           → "Sonnet limit"
+//   seven_day_overage_included → "Fable 5 limit"    (what CodexBar calls "Fable")
+// A plan may expose any subset; every one that's present is surfaced.
 
 import Foundation
-
-// MARK: - Wire format
 
 struct UsagePayload: Decodable {
     let fiveHour: Limit?
     let sevenDay: Limit?
     let sevenDayOpus: Limit?
+    let sevenDaySonnet: Limit?
+    let sevenDayOverage: Limit?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
         case sevenDay = "seven_day"
         case sevenDayOpus = "seven_day_opus"
+        case sevenDaySonnet = "seven_day_sonnet"
+        case sevenDayOverage = "seven_day_overage_included"
     }
 
     func windows(provider: Provider, now: Date) -> [UsageWindow] {
-        [
+        let week = 10_080
+        return [
             fiveHour?.window(provider: provider, minutes: 300, variant: nil, now: now),
-            sevenDay?.window(provider: provider, minutes: 10_080, variant: nil, now: now),
-            sevenDayOpus?.window(provider: provider, minutes: 10_080, variant: "Opus", now: now),
+            sevenDay?.window(provider: provider, minutes: week, variant: nil, now: now),
+            sevenDayOpus?.window(provider: provider, minutes: week, variant: "Opus", now: now),
+            sevenDaySonnet?.window(provider: provider, minutes: week, variant: "Sonnet", now: now),
+            sevenDayOverage?.window(provider: provider, minutes: week, variant: "Fable", now: now),
         ].compactMap { $0 }
     }
 

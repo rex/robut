@@ -7,7 +7,7 @@
 # Run `make help` for a full list of available targets.
 
 .PHONY: help help-stack install env env-check setup validate update info \
-        regenerate run archive notarize release hooks privacy privacy-init \
+        regenerate run archive notarize release hooks privacy privacy-init signing-init \
         dev build start lint typecheck check-architecture check-docs \
         check-precommit check-skeleton sync-skeleton check-skills stamp-skill fix test \
         bump-patch bump-minor bump-major check-version-bumped version \
@@ -517,6 +517,36 @@ claude-probe:
 	@echo "$(CYAN)---$(RESET)"
 	@echo "If that printed usage numbers, the CLI fallback can work."
 	@echo "Share the SHAPE (labels + where percentages sit) to fix the parser."
+
+## signing-init: Write Local.xcconfig with a STABLE signing identity (gitignored)
+#  Ad-hoc signing (the default when Local.xcconfig is absent) binds the
+#  keychain item to the build's content hash, which changes every rebuild
+#  — reintroducing the exact keychain-prompt bug Robut exists to fix. A
+#  real identity makes the code-signing requirement identity-based and
+#  therefore STABLE across rebuilds. The identity name is personal data,
+#  so it lives ONLY in gitignored Local.xcconfig, never the repo.
+signing-init:
+	@if [ -f Local.xcconfig ]; then \
+		echo "$(YELLOW)Local.xcconfig already exists — leaving it.$(RESET)"; \
+	else \
+		IDENTITY=$$(security find-identity -v -p codesigning \
+			| grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/'); \
+		if [ -z "$$IDENTITY" ]; then \
+			IDENTITY=$$(security find-identity -v -p codesigning \
+				| grep "Apple Development" | head -1 | sed -E 's/.*"(.*)".*/\1/'); \
+		fi; \
+		if [ -z "$$IDENTITY" ]; then \
+			echo "$(RED)No Developer ID or Apple Development identity found.$(RESET)"; exit 1; fi; \
+		TEAM=$$(printf '%s' "$$IDENTITY" | sed -E 's/.*\(([A-Z0-9]{10})\)$$/\1/'); \
+		{ echo "// Local signing — GITIGNORED, never committed."; \
+		  echo "// A stable identity so the keychain ACL persists across rebuilds."; \
+		  echo "// Regenerate with: make signing-init"; \
+		  printf 'CODE_SIGN_IDENTITY = %s\n' "$$IDENTITY"; \
+		  printf 'DEVELOPMENT_TEAM = %s\n' "$$TEAM"; \
+		  echo "CODE_SIGN_STYLE = Manual"; \
+		} > Local.xcconfig; \
+		echo "$(GREEN)Wrote Local.xcconfig (stable signing). Run 'make build'.$(RESET)"; \
+	fi
 
 ## privacy: Scan the worktree for personal data (blocking gate)
 privacy:

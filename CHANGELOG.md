@@ -30,6 +30,41 @@ version bumps).
 
 ---
 
+## [0.11.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Fixed
+- **Robut prompted for the keychain password — the exact bug it exists to
+  eliminate.** Cause: local builds were **ad-hoc signed**, whose
+  code-signing designated requirement is the build's content hash
+  (`cdhash`). Every `make build` produces a new hash, so macOS saw each
+  rebuild as a different app and re-prompted for the token item the
+  previous build had created. Same mechanism as CodexBar, self-inflicted
+  via dev signing.
+- Fix: `make signing-init` writes a gitignored `Local.xcconfig` with a
+  STABLE identity (Developer ID / Apple Development). The designated
+  requirement becomes identity-based (`identifier "com.robut.app" and …
+  team`), which is verified stable across rebuilds — so the keychain ACL
+  persists and the prompt never recurs. Production is Developer-ID-signed
+  and was never affected; this was purely a dev-signing artifact.
+
+### Added
+- **All Claude weekly variants.** The response exposes `seven_day` (all
+  models), `seven_day_opus`, `seven_day_sonnet`, and
+  `seven_day_overage_included` (what CodexBar labels "Fable"). An earlier
+  version only read `seven_day_opus`, so the Fable/Sonnet rows were
+  missing. Keys + labels read from the Claude Code binary; each present
+  variant is now shown. Tests pin all of them.
+- A temporary, privacy-safe response-shape log (keys + reset field only,
+  no account data — this response carries none) to pin the exact reset
+  field from one real poll rather than guessing the wire format again.
+
+### Note
+- Known remaining bug, being pinned next: the weekly reset time shows the
+  window-length fallback ("7d") instead of the real reset. The shape log
+  will reveal the actual reset field/format; a regression test
+  (`unixResetHonoured`) already guards the parse. Signing in again (once,
+  under the now-stable signature) is needed since the ad-hoc-bound token
+  item was deleted.
+
 ## [0.10.1] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Changed
 - `AGENTS.md`: record that `setup-token` is inference-only (can't read
