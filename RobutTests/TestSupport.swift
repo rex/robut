@@ -45,22 +45,3 @@ func makeWindow(
         length: lengthHours * 3600
     )
 }
-
-/// A Claude token store that hands back a full-scope, unexpired bundle
-/// (or nothing when `token` is nil). Never touches the real keychain.
-func syntheticClaudeStore(
-    token: String?, scopes: [String] = ["user:inference", "user:profile"]
-) -> ClaudeTokenStore {
-    ClaudeTokenStore(
-        load: {
-            token.map {
-                ClaudeTokenBundle(
-                    accessToken: $0, refreshToken: "synthetic-refresh",
-                    expiresAt: t0.addingTimeInterval(3600), scopes: scopes
-                )
-            }
-        },
-        save: { _ in },
-        clear: {}
-    )
-}

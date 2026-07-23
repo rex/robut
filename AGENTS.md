@@ -25,9 +25,14 @@
 **The one thing to understand before touching auth:** Robut exists because
 CodexBar endlessly re-prompts for the keychain password. Cause: it reads
 *Claude Code's* keychain item, and Claude Code rewrites that item on every
-token refresh, resetting its ACL. An app is never prompted for an item it
-created itself — so Robut reads **only its own** keychain item, and never
-`Claude Code-credentials`. Violating this reintroduces the entire bug.
+token refresh, resetting its ACL. Robut's answer: **hold no credentials at
+all.** Codex usage is read from `~/.codex/sessions` (on disk); Claude usage
+comes from spawning `claude -p "/usage"`, which authenticates *itself*
+against Claude Code's own credentials. Robut never touches any keychain
+item — not its own, not anyone's. Do not add a keychain dependency or read
+`Claude Code-credentials`; that reintroduces the entire bug. (An earlier
+OAuth/token approach was built and removed — it kept breaking on token
+expiry/refresh, and the CLI path is simpler and needs no credential.)
 
 ## 2. Setup
 
@@ -63,8 +68,7 @@ Robut/            app sources
   Core/
     Models/       Provider, UsageWindow, UsageSnapshot (value types)
     Pace/         THE burn-rate + projection engine (pure, heavily tested)
-    Providers/    UsageSource protocol + Codex / Claude implementations
-    Auth/         Robut's OWN keychain item + OAuth. Never reads others'.
+    Providers/    UsageSource protocol + Codex (disk) / Claude (CLI) sources
     History/      local usage sample store (feeds the pace engine)
   UI/             MenuBarExtra face + the usage pane
 RobutTests/       Swift Testing suites (pace engine is the priority)

@@ -26,14 +26,16 @@ It's not a bug anyone can patch from the outside. It's structural.
 
 Robut sidesteps it entirely, on a simple principle:
 
-> **An app is never prompted for a keychain item it created itself.**
+> **Hold no credentials at all.**
 
-- **Codex** needs no credential at all — usage is already on disk, written
-  by Codex itself, in `~/.codex/sessions/`.
-- **Claude** uses Robut's *own* OAuth token in Robut's *own* keychain item,
-  with the `claude` CLI as a fallback.
+- **Codex** usage is already on disk, written by Codex itself, in
+  `~/.codex/sessions/`. Robut just reads it.
+- **Claude** usage comes from running `claude -p "/usage"` — the CLI
+  authenticates *itself* against Claude Code's own credentials. Robut only
+  reads the numbers it prints.
 
-Robut never touches `Claude Code-credentials`. So it never prompts. Ever.
+Robut never touches any keychain item — not `Claude Code-credentials`, not
+one of its own. There is nothing for macOS to prompt about. Ever.
 
 ## What it shows
 

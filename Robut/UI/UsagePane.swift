@@ -9,24 +9,13 @@ struct UsagePane: View {
     @Bindable var model: AppModel
     /// Drives the countdown text without re-fetching anything.
     @State private var now = Date()
-    @State private var showingClaudeSetup = false
 
     private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-
-            if showingClaudeSetup {
-                // Inline, NOT a sheet — a sheet takes key focus, which
-                // makes the menubar panel resign and close. See
-                // ClaudeSetupView.
-                Divider()
-                ClaudeSetupView(model: model) { showingClaudeSetup = false }
-            } else {
-                usageContent
-            }
-
+            usageContent
             Divider()
             footer
         }
@@ -58,13 +47,7 @@ struct UsagePane: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(model.unavailable, id: \.provider) { entry in
-                        UnavailableRow(
-                            provider: entry.provider,
-                            state: entry.state,
-                            action: entry.provider == .claude
-                                ? { showingClaudeSetup = true }
-                                : nil
-                        )
+                        UnavailableRow(provider: entry.provider, state: entry.state)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -173,8 +156,6 @@ private struct WindowRow: View {
 private struct UnavailableRow: View {
     let provider: Provider
     let state: ProviderState
-    /// Present when there's something the user can actually do about it.
-    let action: (() -> Void)?
 
     private var message: String {
         switch state {
@@ -195,11 +176,6 @@ private struct UnavailableRow: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
-            if let action {
-                Button("Set up", action: action)
-                    .buttonStyle(.link)
-                    .font(.system(size: 10))
-            }
         }
     }
 }

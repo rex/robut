@@ -116,24 +116,7 @@ struct ClaudeUsageTextParserTests {
     }
 }
 
-/// Thread-safe "did this run?" flag — the runner closure is `@Sendable`,
-/// so a captured `var` can't be mutated from inside it.
-private final class CallFlag: @unchecked Sendable {
-    private var flag = false
-    private let lock = NSLock()
-
-    func set() {
-        lock.lock(); defer { lock.unlock() }
-        flag = true
-    }
-
-    var wasSet: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return flag
-    }
-}
-
-@Suite("Claude CLI source and fallback")
+@Suite("Claude CLI source")
 struct ClaudeCLISourceTests {
 
     private let usageText = """
@@ -152,82 +135,25 @@ struct ClaudeCLISourceTests {
 
     @Test("Plain (non-JSON) output still parses")
     func plainOutput() async throws {
-        // resultText returns nil for non-JSON; the source falls back to
-        // treating the raw output as the text.
+        // resultText returns nil for non-JSON; the source treats the raw
+        // output as the text.
         #expect(ClaudeCLI.resultText(fromJSONEnvelope: usageText) == nil)
 
-        let source = ClaudeCLIUsageSource { _ in self.usageText }
         guard ClaudeCLI.isInstalled else { return }
+        let source = ClaudeCLIUsageSource { _ in self.usageText }
         let snapshot = try #require(await source.fetch(now: t0).snapshot)
         #expect(snapshot.windows.count == 2)
     }
 
-    @Test("Unreadable output fails loudly instead of inventing data")
-    func unreadableOutput() async {
+    @Test("An always-partial CLI backs off transiently, never fabricating")
+    func partialOutputIsTransient() async {
+        // A run that never yields limit lines must be a TRANSIENT failure,
+        // so the model keeps the last-good data rather than blanking rows.
         guard ClaudeCLI.isInstalled else { return }
         let source = ClaudeCLIUsageSource { _ in "Welcome to Claude Code!" }
         guard case .failed(_, let retry) = await source.fetch(now: t0) else {
-            Issue.record("Expected .failed for unparseable output"); return
+            Issue.record("Expected .failed for output with no limit lines"); return
         }
-        // A transient back-off, so the model keeps last-good data rather
-        // than blanking the rows on a flaky CLI run.
         #expect(retry == .after(5 * 60))
-    }
-
-    @Test("The composite prefers the token path when it works")
-    func prefersToken() async throws {
-        let payload = #"{"five_hour":{"utilization":11,"resets_at":1800005000}}"#
-        let composite = ClaudeCompositeSource(
-            token: ClaudeUsageSource(
-                store: syntheticClaudeStore(token: "synthetic"),
-                authStatus: { nil },
-                session: StubURLProtocol.stub(status: 200, json: payload)
-            ),
-            cli: ClaudeCLIUsageSource { _ in self.usageText }
-        )
-        let snapshot = try #require(await composite.fetch(now: t0).snapshot)
-        // 11% is the token path's number; the CLI stub says 42%.
-        #expect(abs((snapshot.windows.first?.usedFraction ?? 0) - 0.11) < 0.0001)
-    }
-
-    @Test("The composite falls back to the CLI when the token is rejected")
-    func fallsBackOnRejectedToken() async throws {
-        guard ClaudeCLI.isInstalled else { return }
-        let composite = ClaudeCompositeSource(
-            token: ClaudeUsageSource(
-                store: syntheticClaudeStore(token: "rejected"),
-                authStatus: { nil },
-                session: StubURLProtocol.stub(status: 401, json: "{}")
-            ),
-            cli: ClaudeCLIUsageSource { _ in self.usageText }
-        )
-        let snapshot = try #require(await composite.fetch(now: t0).snapshot)
-        #expect(abs((snapshot.windows.first?.usedFraction ?? 0) - 0.42) < 0.0001)
-    }
-
-    @Test("The composite does NOT fall back on a rate limit")
-    func noFallbackWhileRateLimited() async {
-        // This is the important one. The CLI hits the same endpoint, so
-        // spawning it during a 429 would be a second way to make the
-        // rate limit worse — exactly the mistake that started all this.
-        let cliWasCalled = CallFlag()
-        let composite = ClaudeCompositeSource(
-            token: ClaudeUsageSource(
-                store: syntheticClaudeStore(token: "synthetic"),
-                authStatus: { nil },
-                session: StubURLProtocol.stub(status: 429, json: "{}")
-            ),
-            cli: ClaudeCLIUsageSource { [usageText] _ in
-                cliWasCalled.set()
-                return usageText
-            }
-        )
-
-        let state = await composite.fetch(now: t0)
-        #expect(cliWasCalled.wasSet == false)
-        guard case .failed(_, let retry) = state else {
-            Issue.record("Expected the rate-limited failure to be reported"); return
-        }
-        #expect(retry == .after(RetryPolicy.defaultRateLimitPause))
     }
 }

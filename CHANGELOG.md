@@ -30,6 +30,27 @@ version bumps).
 
 ---
 
+## [0.15.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Removed
+- **The entire Claude OAuth / token / keychain layer.** By decision, the
+  `claude` CLI is now the sole Claude source, so Robut holds NO credential
+  of its own — the cleanest possible form of "never read another app's
+  keychain item": it reads none. Deleted `ClaudeOAuth`, `ClaudeTokenStore`,
+  `ClaudeTokenBundle`, `RobutKeychain`, the token/JSON `ClaudeUsageSource`
+  + `ClaudeUsageWire`, `ClaudeCompositeSource`, the PKCE sign-in flow
+  (`AppModel+ClaudeAuth`, `ClaudeSetupView`), `ClaudeCLI.authStatus`, and
+  the now-dead `URLSession.robut`. Robut makes no direct network calls at
+  all; the CLI it spawns authenticates itself.
+- Removed the "Sign in with Claude" UI. Claude either shows data, or a
+  muted "not set up on this Mac" row when Claude Code isn't installed.
+
+### Changed
+- `AppModel` sources are now `[CodexUsageSource, ClaudeCLIUsageSource]`.
+- README + AGENTS.md updated: the principle is now "hold no credentials at
+  all" rather than "own your own keychain item".
+- Net −900-ish lines; 51 tests (was 83 — the deleted paths took their
+  tests with them), all green.
+
 ## [0.14.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Fixed
 - **Windows are grouped by provider.** All of a provider's rows are now

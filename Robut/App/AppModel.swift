@@ -21,10 +21,9 @@ final class AppModel {
     private(set) var isRefreshing = false
     /// When the in-flight refresh began. Enables a self-healing
     /// single-flight guard: a refresh still "running" past this cap is
-    /// presumed wedged and may be superseded, so a hung request can never
-    /// permanently block refreshes. The cap sits above the HTTP resource
-    /// timeout (`URLSession.robut`, 45s) so a genuinely-working refresh is
-    /// never cut off.
+    /// presumed wedged and may be superseded, so nothing can permanently
+    /// block refreshes. The cap sits above the CLI's own 45s timeout so a
+    /// genuinely-working refresh is never cut off.
     private var refreshStartedAt: Date?
     static let refreshHangCap: TimeInterval = 60
 
@@ -51,10 +50,10 @@ final class AppModel {
     private var nextFetchAllowed: [Provider: Date] = [:]
 
     init(sources: [any UsageSource]? = nil, history: UsageHistoryStore = UsageHistoryStore()) {
-        // v1 tracks Codex (zero-auth, read from local session files) and
-        // Claude (Robut's own token, falling back to the CLI when there
-        // isn't a usable one — see ClaudeCompositeSource).
-        self.sources = sources ?? [CodexUsageSource(), ClaudeCompositeSource()]
+        // v1 tracks Codex (read from local session files) and Claude (via
+        // the `claude` CLI). Robut holds NO credentials of its own for
+        // either — Codex is on disk, and the CLI authenticates itself.
+        self.sources = sources ?? [CodexUsageSource(), ClaudeCLIUsageSource()]
         self.history = history
         for source in self.sources { states[source.provider] = .loading }
     }
@@ -210,11 +209,6 @@ final class AppModel {
         nextFetchAllowed.removeAll()
         await refresh()
     }
-
-    /// PKCE for the in-flight Claude sign-in. Held only between opening
-    /// the browser and pasting the code back; never persisted. Not private
-    /// so the sign-in extension (AppModel+ClaudeAuth) can reach it.
-    var pendingPKCE: ClaudePKCE?
 
     /// Providers in a non-ready state, for the pane's muted footer rows.
     var unavailable: [(provider: Provider, state: ProviderState)] {

@@ -16,13 +16,16 @@
 // it would report 0% across the board, a confident lie about remaining
 // quota. There's a regression test.
 //
-// Trade-offs vs. the token path (ClaudeUsageSource):
-//   + No credential in Robut, nothing to expire, nothing to paste.
+// Trade-offs vs. a token/JSON approach (tried, then removed — it kept
+// breaking on OAuth expiry/refresh):
+//   + No credential in Robut, nothing to expire, nothing to sign into.
 //   − Slow: spawns a whole CLI process, seconds not milliseconds.
 //   − Text output is not a contract and can change under us.
 //
-// So this is the FALLBACK, used when the token path can't serve. See
-// ClaudeCompositeSource for the arbitration.
+// This is the SOLE Claude source: Robut holds no Claude credential at all
+// (the CLI reads Claude Code's own auth), which is the cleanest possible
+// alignment with the rule that Robut never reads another app's keychain —
+// it reads none.
 
 import Foundation
 
@@ -76,67 +79,5 @@ struct ClaudeCLIUsageSource: UsageSource {
             reason: "Claude usage momentarily unavailable",
             retry: .after(5 * 60)
         )
-    }
-}
-
-// MARK: - Composite
-
-/// Prefers the token path, falls back to the CLI.
-///
-/// The fallback fires ONLY when the token path structurally cannot work —
-/// no token, or one the server rejected. It deliberately does NOT fire on
-/// a rate limit or a server error: those mean "ask again later", and
-/// spawning a CLI that hits the very same endpoint would just be a second
-/// way to make the problem worse.
-struct ClaudeCompositeSource: UsageSource {
-    let provider = Provider.claude
-
-    let token: ClaudeUsageSource
-    let cli: ClaudeCLIUsageSource
-
-    init(
-        token: ClaudeUsageSource = ClaudeUsageSource(),
-        cli: ClaudeCLIUsageSource = ClaudeCLIUsageSource()
-    ) {
-        self.token = token
-        self.cli = cli
-    }
-
-    func fetch(now: Date) async -> ProviderState {
-        let primary = await token.fetch(now: now)
-        guard shouldFallBack(from: primary) else { return primary }
-
-        // The token path can't serve, so the CLI is the operative path.
-        let fallback = await cli.fetch(now: now)
-        switch fallback {
-        case .ready:
-            Log.providers.notice("claude: token path unavailable, served by CLI")
-            return fallback
-        case .notConfigured:
-            // No CLI to fall back to → show the token's guidance (sign in).
-            return primary
-        case .failed, .loading:
-            // The CLI IS the working path (it needs no token), so surface
-            // ITS state, not "sign in". A transient CLI failure then lets
-            // the model keep the last-good data instead of nagging.
-            return fallback
-        }
-    }
-
-    private func shouldFallBack(from state: ProviderState) -> Bool {
-        switch state {
-        case .ready:
-            false
-        case .notConfigured:
-            // No token AND Claude Code isn't signed in — nothing to fall
-            // back to.
-            false
-        case .loading:
-            false
-        case .failed(_, let retry):
-            // .userAction means "no usable token". That is exactly the
-            // gap the CLI fills. Rate limits and transient errors are not.
-            retry == .userAction
-        }
     }
 }
