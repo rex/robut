@@ -109,7 +109,7 @@ enum ClaudeOAuth {
     // MARK: - Token exchange
 
     static func exchange(
-        code: String, pkce: ClaudePKCE, session: URLSession = .shared
+        code: String, pkce: ClaudePKCE, session: URLSession = .robut
     ) async throws -> ClaudeTokenBundle {
         try await post([
             "grant_type": "authorization_code",
@@ -122,7 +122,7 @@ enum ClaudeOAuth {
     }
 
     static func refresh(
-        refreshToken: String, session: URLSession = .shared
+        refreshToken: String, session: URLSession = .robut
     ) async throws -> ClaudeTokenBundle {
         try await post([
             "grant_type": "refresh_token",

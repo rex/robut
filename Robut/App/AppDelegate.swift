@@ -31,6 +31,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Log.app.notice("applicationDidFinishLaunching")
         AppModel.shared.start()
+        observeWake()
+    }
+
+    /// Refresh immediately when the Mac wakes. Usage is hours stale after
+    /// sleep, and — combined with the self-healing refresh guard — this is
+    /// what recovers from a request that stalled across sleep (the stuck
+    /// spinner / "updated 5h ago" symptom).
+    private func observeWake() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                Log.app.notice("system wake — refreshing")
+                Task { await AppModel.shared.refresh() }
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

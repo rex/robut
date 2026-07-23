@@ -19,6 +19,14 @@ final class AppModel {
     private(set) var verdicts: [String: PaceVerdict] = [:]
     private(set) var lastRefresh: Date?
     private(set) var isRefreshing = false
+    /// When the in-flight refresh began. Enables a self-healing
+    /// single-flight guard: a refresh still "running" past this cap is
+    /// presumed wedged and may be superseded, so a hung request can never
+    /// permanently block refreshes. The cap sits above the HTTP resource
+    /// timeout (`URLSession.robut`, 45s) so a genuinely-working refresh is
+    /// never cut off.
+    private var refreshStartedAt: Date?
+    static let refreshHangCap: TimeInterval = 60
 
     /// App-lifetime instance.
     ///
@@ -102,11 +110,19 @@ final class AppModel {
     // MARK: - Refresh
 
     func refresh() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
-
         let now = Date()
+        // Self-healing single-flight. A normal refresh finishes in well
+        // under the cap; only a wedged one (e.g. a request stalled across
+        // system sleep — the bug that left the spinner stuck and "updated
+        // 5h ago") gets superseded.
+        if let startedAt = refreshStartedAt, now.timeIntervalSince(startedAt) < Self.refreshHangCap {
+            return
+        }
+        refreshStartedAt = now
+        isRefreshing = true
+        // Only the CURRENT refresh clears the flags — a superseded,
+        // late-returning refresh must not stomp a newer one's state.
+        defer { if refreshStartedAt == now { isRefreshing = false; refreshStartedAt = nil } }
 
         // Skip anything still in its back-off window. Its previous state
         // stays on screen, so the user keeps seeing why.

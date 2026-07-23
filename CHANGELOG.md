@@ -30,6 +30,32 @@ version bumps).
 
 ---
 
+## [0.12.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Fixed
+- **The refresh loop wedged after system sleep — stuck spinner, "updated
+  5h ago".** Provider calls used `URLSession.shared`, whose
+  `timeoutIntervalForResource` is SEVEN DAYS. A request in flight when the
+  Mac slept never returned, so `await session.data(...)` hung forever,
+  `isRefreshing` stayed true, and the single-flight guard blocked every
+  later refresh. Confirmed by sampling: 0% CPU, a suspended async task on
+  a URLSession continuation that never fires.
+  - All provider/auth requests now use `URLSession.robut` with a 45s
+    resource timeout, so a request always completes or fails — a refresh
+    can never hang the loop.
+  - The single-flight guard is now self-healing: a refresh "running" past
+    a 60s cap is presumed wedged and can be superseded (with a guard so a
+    late-returning superseded refresh can't stomp newer state).
+  - `NSWorkspace.didWakeNotification` triggers an immediate refresh on
+    wake, so usage isn't hours stale after sleep.
+
+### Changed
+- Added `seven_day_sonnet` / `seven_day_overage_included` (Fable) window
+  keys (from the earlier wire-format fix) and corrected the stale
+  ClaudeUsageSource header, which still described the abandoned
+  setup-token approach. Removed the temporary response-shape diagnostic;
+  reset-time parsing is confirmed working (real "resets in 6d 18h", not
+  the window-length fallback).
+
 ## [0.11.2] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Security
 - **The privacy gate now scans commit MESSAGES, not just file content.**
