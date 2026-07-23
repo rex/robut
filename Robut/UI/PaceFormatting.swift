@@ -84,4 +84,41 @@ enum PaceFormatting {
     static func absoluteReset(_ date: Date) -> String {
         date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
+
+    /// The one-line summary the pane header leads with: worst-case, calm,
+    /// and — when something needs attention — it names the binding window.
+    static func summaryText(outlook: PaceOutlook?, window: UsageWindow?) -> String {
+        guard let outlook else { return "Waiting on usage data." }
+        return switch outlook {
+        case .unknown: "Measuring pace…"
+        case .idle, .comfortable: "You're on track everywhere."
+        case .tight: "\(name(window)) is getting tight."
+        case .shortfall: "On pace to run dry before reset."
+        case .exhausted: "\(name(window)) is out of quota."
+        }
+    }
+
+    /// Short, lowercase chip label for a provider group's worst outlook.
+    static func badgeLabel(_ outlook: PaceOutlook?) -> String {
+        guard let outlook else { return "measuring" }
+        return switch outlook {
+        case .comfortable: "on track"
+        case .idle: "idle"
+        case .tight: "tight"
+        case .shortfall: "runs dry early"
+        case .exhausted: "spent"
+        case .unknown: "measuring"
+        }
+    }
+
+    /// "Codex weekly", "Claude session" — provider + window, for a sentence.
+    private static func name(_ window: UsageWindow?) -> String {
+        guard let window else { return "Usage" }
+        let kind: String = switch window.kind {
+        case .session: "session"
+        case .weekly: "weekly"
+        case .other: "limit"
+        }
+        return "\(window.provider.displayName) \(kind)"
+    }
 }

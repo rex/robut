@@ -1,8 +1,18 @@
-// AppModel+Derived.swift — what the UI reads: ordered windows and the
-// menubar mood. Split from AppModel to keep that file within the
-// architecture line limit.
+// AppModel+Derived.swift — what the UI reads: ordered windows, provider
+// groups, and the menubar mood. Split from AppModel to keep that file
+// within the architecture line limit.
 
 import Foundation
+
+/// A provider and all of its windows, with the provider's worst outlook —
+/// the unit the pane renders as one titled, badged group.
+struct ProviderUsageGroup: Identifiable {
+    let provider: Provider
+    let worstOutlook: PaceOutlook?
+    let windows: [UsageWindow]
+
+    var id: String { provider.rawValue }
+}
 
 @MainActor
 extension AppModel {
@@ -40,4 +50,34 @@ extension AppModel {
     }
 
     var mood: RobotMood { RobotMood(outlook: worstOutlook) }
+
+    /// `allWindows` folded into per-provider groups, preserving order (so the
+    /// worst-pace provider stays first, session before weekly within each).
+    var providerGroups: [ProviderUsageGroup] {
+        var order: [Provider] = []
+        var byProvider: [Provider: [UsageWindow]] = [:]
+        for window in allWindows {
+            if byProvider[window.provider] == nil { order.append(window.provider) }
+            byProvider[window.provider, default: []].append(window)
+        }
+        return order.map { provider in
+            let windows = byProvider[provider] ?? []
+            let worst = windows
+                .compactMap { verdicts[$0.id]?.outlook }
+                .max { $0.severity < $1.severity }
+            return ProviderUsageGroup(provider: provider, worstOutlook: worst, windows: windows)
+        }
+    }
+
+    /// The window driving the worst outlook — named in the summary line.
+    var worstWindow: UsageWindow? {
+        allWindows.max {
+            (verdicts[$0.id]?.outlook.severity ?? 0) < (verdicts[$1.id]?.outlook.severity ?? 0)
+        }
+    }
+
+    /// The answer-first headline for the whole pane.
+    var summaryText: String {
+        PaceFormatting.summaryText(outlook: worstOutlook, window: worstWindow)
+    }
 }

@@ -116,6 +116,15 @@ struct UsageWindow: Sendable, Hashable, Identifiable, Codable {
 
     /// When this window began, inferred from its reset time and length.
     var startedAt: Date { resetsAt.addingTimeInterval(-length) }
+
+    /// How far into the window we are: 0 (just started) → 1 (about to
+    /// reset). This is exactly where an even burn — one that lands at empty
+    /// right on reset — would sit, so the UI draws it as the "safe pace"
+    /// marker. A pure function of the window and `now`.
+    func elapsedFraction(now: Date) -> Double {
+        guard length > 0 else { return 0 }
+        return max(0, min(1, now.timeIntervalSince(startedAt) / length))
+    }
 }
 
 /// One provider's complete state at one moment.

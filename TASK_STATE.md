@@ -11,8 +11,10 @@
 
 **Robut** — a macOS menubar app showing Claude + Codex usage with burn-rate
 projection ("will my current pace last until reset?"). It is **fully built,
-working, and running** (v0.15.0): Codex + Claude both show live usage with
-pace verdicts, grouped by provider, with absolute weekly reset times.
+working, and running** (v0.16.0): Codex + Claude both show live usage with
+pace verdicts, in a pane **rebuilt to the Robut Design System** — `Theme`
+tokens, self-hosted Geist, provider groups, SegmentMeters, an answer-first
+summary headline, and the per-bar pace marker.
 
 **Architecture is settled:**
 - Codex usage: read from `~/.codex/sessions/**/*.jsonl` (on disk).
@@ -23,13 +25,14 @@ pace verdicts, grouped by provider, with absolute weekly reset times.
 - The pace math lives in `Core/Pace/PaceEngine.swift` (pure, clock-injected,
   heavily tested — this is the product; treat it as load-bearing).
 
-**Current context:** Claude Design is working on the UI in parallel — so
-DON'T invest in visual polish; keep the data layer clean and correct for
-their handoff. Working tree clean, everything pushed. Everything green
-(51 tests, lint, privacy, architecture).
+**Current context:** Claude Design delivered the Robut Design System (the
+claude.ai design project, synced via the DesignSync tool) and it is now
+INTEGRATED — the `Theme` token layer, self-hosted Geist/Geist Mono, the
+component views, the rebuilt pane, and the pace marker all shipped in
+v0.16.0. Everything green (59 tests, lint, privacy, architecture).
 
-**Next planned work:** the "pace marker" feature — see §5. Nothing is
-mid-flight; safe to pause here.
+**Next planned work:** distribution (Slice 5.1) and the confirmed low-usage
+`.shortfall` fix (§3). Nothing is mid-flight; safe to pause here.
 
 **Read `AGENTS.md` §1 and §9 before touching anything.** This is a **public
 repo** — no personal data, ever (`make privacy`; a commit-msg gate scans
@@ -62,8 +65,8 @@ keychain-prompt bug returns).
 | 0 | Scaffold + privacy gate | ✅ done | Repo bootstrapped; privacy gate blocking on every commit |
 | 1 | Core app + Codex | ✅ done | Builds, launches to menubar, real Codex usage + pace verdict |
 | 2 | Claude provider (CLI) | ✅ done | Live Claude usage via `claude /usage`; all windows, correct resets |
-| 3 | UI polish | 🟡 external | Claude Design is doing this in parallel — don't duplicate |
-| 4 | Pace marker | ⏸ pending | Per-bar "on-budget" line (see §2 Slice 4.1) |
+| 3 | Design system + pane rebuild | ✅ done | `Theme` + Geist; pane rebuilt to the DS kit (v0.16.0) |
+| 4 | Pace marker | ✅ done | Per-bar elapsed-fraction tick on the SegmentMeter |
 | 5 | Distribution | ⏸ pending | Signed, notarized, Sparkle auto-update, published to Releases |
 | 6 | CI | ⏸ pending | `macos-latest` workflow: build + test + lint + privacy |
 
@@ -71,10 +74,12 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 2. Slices (vertical, atomic, independently mergeable)
 
-### Slice 4.1 — Pace marker in each progress bar  ← NEXT
+### Slice 4.1 — Pace marker in each progress bar  ✅ DONE
 
-- Status: ⏸ pending (requested 2026-07-23). Coordinate with Claude Design —
-  they own the visual; this slice provides the value + a simple mark.
+- Status: ✅ done (2026-07-23, v0.16.0). Shipped with the design-system
+  integration: `SegmentMeter` draws a 2px tick at
+  `window.elapsedFraction(now:)` — the even-pace, land-at-empty-on-reset
+  position — in `--text-primary` at 55%.
 - **What the maintainer wants:** a marker line on each progress bar showing where
   usage *would* be if consumption were perfectly even across the whole
   window and hit exactly 100% at reset (0 to spare). If the fill is LEFT of
@@ -89,10 +94,10 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 - Files: `Robut/UI/UsagePane.swift` (`WindowRow` — draw the mark over the
   `ProgressView`, e.g. an overlay at `x = elapsedFraction * width`).
 - Acceptance:
-  - [ ] Marker at elapsed-fraction on every window's bar.
-  - [ ] Correct at window start (~0), midpoint (~0.5), near reset (~1).
-  - [ ] Add `elapsedFraction(now:)` (or similar) to `UsageWindow` + a test.
-  - [ ] Lint + privacy green. Don't touch `Core/Pace/**` logic.
+  - [x] Marker at elapsed-fraction on every window's bar.
+  - [x] Correct at window start (~0), midpoint (~0.5), near reset (~1).
+  - [x] Added `elapsedFraction(now:)` to `UsageWindow` + `UsageWindowTests`.
+  - [x] Lint + privacy green. `Core/Pace/**` logic untouched.
 
 ### Slice 5.1 — Sign, notarize, Sparkle, Releases
 
@@ -105,14 +110,26 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 3. Blockers / open questions
 
-- **Watch:** a window occasionally computed `.shortfall` (red) at LOW usage
-  during the churny debug session. Likely a transient pace-history artifact
-  (dozens of relaunches + changing window set), but VERIFY over a normal day
-  that a low-% window never shows red. If it persists, look at
-  `PaceEngine.burnRate` fitting against the real `UsageHistoryStore` samples.
+- **CONFIRMED (2026-07-23): a LOW-usage window shows red `.shortfall`.** Seen
+  live during the v0.16.0 visual check: Claude **Weekly at 7% used** →
+  "Runs dry ~1d 20h early" with `<1%/hr now · <1%/hr sustainable`. So it is
+  NOT a churny-debug artifact; it recurs in normal use. It's a `PaceEngine`
+  projection problem at tiny rates (dividing by a near-zero sustainable rate,
+  or a noisy least-squares slope on a nearly-flat, low-fraction series) — a
+  false alarm that undermines the app's core promise. Fix: write a failing
+  test (a low-fraction, low-rate window must read `.idle`/`.comfortable`, never
+  `.shortfall`), then correct the fit/threshold in `Core/Pace`. NOT the new UI.
 
 ## 4. Recent decisions (append-only, newest first)
 
+- 2026-07-23 — **Integrated the Robut Design System** (claude.ai design
+  project, via the DesignSync tool). Ported tokens into a Swift `Theme`
+  (`Robut/UI/Theme/`), with the four status colours SOURCED FROM
+  `RobotMood.nsTint` (not duplicated). Self-hosted Geist + Geist Mono (OFL
+  variable fonts, `Robut/Resources/Fonts/`), registered at runtime and
+  selected by exact `wght` axis via CoreText. Rebuilt the pane to the DS
+  `ui_kits/menubar` kit (summary headline, glow wash, provider groups + badge,
+  `SegmentMeter`, per-window verdict) and shipped the pace marker. v0.16.0.
 - 2026-07-23 — **Claude data = the `claude` CLI, sole source. OAuth/token/
   keychain layer DELETED** (~1,650 lines). Robut holds no credentials. The
   CLI kept working where OAuth kept breaking on expiry/refresh.
@@ -130,41 +147,42 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 5. Next actions (ordered)
 
-1. **Slice 4.1 — pace marker** (the math is trivial; see §2). Coordinate
-   with Claude Design so the mark fits their visual.
-2. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon.
+1. **Fix the low-usage `.shortfall` false alarm** (§3) — CONFIRMED in normal
+   use. Touches `Core/Pace`; write the failing test first.
+2. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon (no asset
+   catalog yet; `AppIcon` is referenced in `project.yml` but absent).
 3. CI (`macos-latest`: build + test + lint + privacy).
-4. Investigate the low-usage `.shortfall` sighting (§3) if it recurs.
+4. Optional: import the remaining brand PNGs (mascot/wordmark/lockups) into an
+   asset catalog for onboarding/marketing surfaces — fonts are already
+   vendored, but the PNGs still live only in the design project.
 
-## 6. Handoff note (compaction, 2026-07-23)
+## 6. Handoff note (2026-07-23, v0.16.0)
 
-**State:** Robut is fully built, running, and correct at **v0.15.0** —
-Codex (disk) + Claude (CLI) both live, grouped by provider, absolute weekly
-resets, Fable/Sonnet/Opus windows. Working tree clean, all pushed, all gates
-green (51 tests / 9 suites, lint, privacy, architecture).
+**State:** Robut is fully built, running, and correct at **v0.16.0** —
+Codex (disk) + Claude (CLI) both live, in a pane rebuilt to the Robut Design
+System. Working tree committed + pushed, all gates green (59 tests / 10
+suites, lint, privacy, architecture, module-rules). Verified live: the pane
+renders correctly (provider groups, badges, SegmentMeters + pace marker,
+summary headline, glow wash), Geist loads, the menubar item has real width.
 
-**Now:** Claude Design is building the UI in parallel — do NOT polish
-visuals; keep the data model clean. Next coding work is the **pace marker**
-(§2 Slice 4.1) — a pure function of the window (elapsed fraction), no engine
-change. Nothing is mid-flight; the pause is safe.
+**What shipped this session (design-system integration):**
+- `Robut/UI/Theme/` — `ColorHex`, `Theme` (colour/metrics/radius/motion),
+  `Fonts` (Geist/Geist Mono via CoreText `wght` variation).
+- `Robut/UI/Components/` — `SegmentMeter` (+ pace marker), `StatusBadge`.
+- `Robut/UI/` — `PaneHeader`, `WindowRowView` (group/window/unavailable),
+  rebuilt `UsagePane`.
+- Model: `UsageWindow.elapsedFraction(now:)`, `PaceFormatting.summaryText` /
+  `badgeLabel`, `AppModel.providerGroups` / `worstWindow` / `summaryText`.
+- Fonts vendored at `Robut/Resources/Fonts/` (OFL), registered in
+  `AppDelegate`.
 
-**Traps not to re-introduce** (all in `AGENTS.md` §9): no keychain
-dependency (Robut holds zero credentials now); `make signing-init` before
-building or the keychain prompt returns; `MenuBarExtra` label can't use
-`.task`/`Canvas`/lazy-`NSImage`; `make test` must not run the app on the
-network (guarded); never auto-retry an auth failure; bounded timeouts so a
-sleep-stalled request can't wedge the loop.
+**Next:** (1) the CONFIRMED low-usage `.shortfall` fix (§3) — a `Core/Pace`
+change, failing test first; (2) Slice 5.1 distribution + app icon; (3) CI.
 
-**What works end to end:** menubar robot whose face+colour track worst-case
-pace; usage pane leading with the verdict sentence; Codex usage read with zero
-credentials from `~/.codex/sessions`; history backfill seeding ~1,500 samples
-on first launch so the pace verdict is meaningful immediately.
-
-**Not yet built:** Claude provider (the other half of the value), signing /
-notarization / Sparkle, CI, app icon.
-
-**Two traps to not re-introduce:**
-1. `.task` on a `MenuBarExtra` label never fires — startup must stay in
-   `RobutApp.init`. Symptom is an icon that renders fine and an empty history.
-2. Reading `Claude Code-credentials` reintroduces the exact keychain-prompt
-   bug this app exists to eliminate. Robut reads only its own item.
+**Traps not to re-introduce** (all in `AGENTS.md` §9): no keychain/OAuth/token
+dependency (Robut holds zero credentials); `make signing-init` before building;
+`MenuBarExtra` label can't use `.task`/`Canvas`/lazy-`NSImage` (only `RobotIcon`
+bitmap — the menubar item was verified 36×24, not zero-width); `make test` must
+not touch the network (guarded); never auto-retry an auth failure. And now: the
+four status colours have ONE home — `RobotMood.nsTint`; `Theme.status(_:)`
+surfaces them, so never retune them in `Theme`.

@@ -30,6 +30,27 @@ version bumps).
 
 ---
 
+## [0.16.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Added
+- **Design-system foundations in Swift.** Ported the Robut Design System
+  (the claude.ai design project) into a `Theme` token layer — colour,
+  metrics, radius, motion — with the four status colours sourced from
+  `RobotMood.nsTint` so the pane and the menubar icon can never drift.
+- **Self-hosted Geist + Geist Mono** (OFL variable fonts, vendored under
+  `Robut/Resources/Fonts`), registered at runtime and selected by exact
+  `wght` axis via CoreText (SwiftUI `.weight()` can't drive a variable axis).
+- **`SegmentMeter`** — the pixel/8-bit block meter — carrying the **pace
+  marker**: a tick at the window's elapsed fraction (the even-pace,
+  land-at-empty-on-reset position), so fill left of the tick = under budget.
+- `UsageWindow.elapsedFraction(now:)`, `PaceFormatting.summaryText` /
+  `badgeLabel`, `AppModel.providerGroups`, and `StatusBadge` / `StatusDot`,
+  each with unit tests for the new pure logic.
+### Changed
+- **Rebuilt the usage pane** to the design system's stylized kit: an
+  answer-first summary headline, a mood-tinted glow wash, provider groups
+  with a worst-case badge, retro SegmentMeters, and the answer-first verdict
+  per window — composed from small per-component views. Pane widened to 312.
+
 ## [0.15.1] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Changed
 - Refreshed `TASK_STATE.md` and `PROGRESS.md` for context compaction:

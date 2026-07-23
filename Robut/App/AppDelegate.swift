@@ -13,6 +13,10 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Register the self-hosted Geist / Geist Mono faces once, before any
+        // pane renders. Idempotent, local, and harmless under tests.
+        _ = RobutFont.registered
+
         // ⛔️ Do NOT start the refresh loop under XCTest.
         //
         // A unit-test bundle for an app target uses the app itself as its

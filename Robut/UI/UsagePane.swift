@@ -1,7 +1,10 @@
 // UsagePane.swift — the panel under the menubar icon.
 //
-// One screenful, no scrolling, no tabs, no settings buried three levels
-// down. Worst-pace window first, because that's the one that will bite.
+// One screenful, no scrolling, worst-pace window first. A stylized,
+// provider-grouped rethink of the original sparse list (Robut Design System,
+// ui_kits/menubar): an answer-first summary headline, a mood-tinted glow
+// wash, provider groups with a worst-case badge, retro SegmentMeters, and the
+// answer-first verdict per window.
 
 import SwiftUI
 
@@ -14,73 +17,66 @@ struct UsagePane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-            usageContent
-            Divider()
+            PaneHeader(
+                mood: model.mood,
+                summary: model.summaryText,
+                isRefreshing: model.isRefreshing
+            )
+            content
+            hairline
             footer
         }
-        .frame(width: 300)
+        .frame(width: Theme.Metrics.paneWidth)
+        .background {
+            ZStack(alignment: .top) {
+                Theme.Colors.panel
+                glowWash
+            }
+        }
         .onReceive(tick) { now = $0 }
         .task { await model.refresh() }
     }
 
     @ViewBuilder
-    private var usageContent: some View {
-        Group {
-            if model.allWindows.isEmpty {
-                empty
-            } else {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(model.allWindows) { window in
-                        WindowRow(
-                            window: window,
-                            verdict: model.verdicts[window.id],
-                            now: now
-                        )
-                    }
+    private var content: some View {
+        if model.providerGroups.isEmpty {
+            empty
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(model.providerGroups.enumerated()), id: \.element.id) { index, group in
+                    if index > 0 { hairline.padding(.vertical, 2) }
+                    ProviderGroupView(group: group, verdicts: model.verdicts, now: now)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
             }
+            .padding(.top, 2)
+            .padding(.bottom, Theme.Metrics.padY)
+        }
 
-            if !model.unavailable.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(model.unavailable, id: \.provider) { entry in
-                        UnavailableRow(provider: entry.provider, state: entry.state)
-                    }
+        if !model.unavailable.isEmpty {
+            hairline
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(model.unavailable, id: \.provider) { entry in
+                    UnavailableRowView(provider: entry.provider, state: entry.state)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
             }
+            .padding(.horizontal, Theme.Metrics.padX)
+            .padding(.vertical, Theme.Metrics.footerPad)
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            RobotFace(mood: model.mood, size: 18)
-            Text("Robut").font(.system(size: 13, weight: .semibold))
-            Spacer()
-            if model.isRefreshing {
-                ProgressView().controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
     }
 
     private var empty: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("No usage data yet")
-                .font(.system(size: 12, weight: .medium))
-            Text("Robut reads Codex usage from local session files. Use Codex once and it'll show up here.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(RobutFont.ui(12, .medium))
+                .foregroundStyle(Theme.Colors.textPrimary)
+            Text("Robut reads Codex usage from local session files. "
+                 + "Use Codex once and it'll show up here.")
+                .font(RobutFont.ui(11))
+                .foregroundStyle(Theme.Colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Theme.Metrics.padX)
+        .padding(.vertical, Theme.Metrics.padY)
     }
 
     private var footer: some View {
@@ -89,93 +85,42 @@ struct UsagePane: View {
             // that clears a back-off.
             Button("Refresh") { Task { await model.retryNow() } }
                 .buttonStyle(.link)
-                .font(.system(size: 11))
+                .font(RobutFont.ui(11, .medium))
 
             if let last = model.lastRefresh {
                 Text("updated \(PaceFormatting.duration(now.timeIntervalSince(last))) ago")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .font(RobutFont.ui(10))
+                    .foregroundStyle(Theme.Colors.textTertiary)
             }
 
             Spacer()
 
             Button("Quit") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
+                .buttonStyle(.plain)
+                .font(RobutFont.ui(11, .medium))
+                .foregroundStyle(Theme.Colors.textSecondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-    }
-}
-
-/// One usage window: what it is, how full, and — the point — the verdict.
-private struct WindowRow: View {
-    let window: UsageWindow
-    let verdict: PaceVerdict?
-    let now: Date
-
-    private var mood: RobotMood { RobotMood(outlook: verdict?.outlook) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(window.provider.displayName) · \(window.label)")
-                    .font(.system(size: 11, weight: .medium))
-                Spacer()
-                Text(PaceFormatting.percent(window.usedFraction))
-                    .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
-            }
-
-            ProgressView(value: window.usedFraction)
-                .progressViewStyle(.linear)
-                .tint(mood.tint)
-
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(verdict.map(PaceFormatting.verdictText) ?? "Measuring pace…")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(mood == .dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(mood.tint))
-                Spacer()
-                Text(PaceFormatting.resetText(for: window, now: now))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-
-            if let detail = verdict.flatMap(PaceFormatting.detailText) {
-                Text(detail)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
-        }
-    }
-}
-
-/// A provider that can't be read right now. Muted, never alarming — this
-/// is information, not an interruption.
-private struct UnavailableRow: View {
-    let provider: Provider
-    let state: ProviderState
-
-    private var message: String {
-        switch state {
-        case .loading: "checking…"
-        case .notConfigured: "not set up on this Mac"
-        case .failed(let reason, _): reason
-        case .ready: ""
-        }
+        .padding(.horizontal, Theme.Metrics.padX)
+        .padding(.vertical, Theme.Metrics.footerPad)
     }
 
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle().frame(width: 5, height: 5).foregroundStyle(.tertiary)
-            Text(provider.displayName).font(.system(size: 11, weight: .medium))
-            Text(message)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 4)
+    private var hairline: some View {
+        Rectangle().fill(Theme.Colors.hairline).frame(height: 1)
+    }
+
+    /// A faint radial halo in the worst-case status colour at the top of the
+    /// panel, so the signal reads even peripherally. Hidden when dim.
+    @ViewBuilder
+    private var glowWash: some View {
+        if model.mood != .dim {
+            RadialGradient(
+                colors: [Theme.status(model.mood).opacity(0.20), .clear],
+                center: UnitPoint(x: 0.18, y: -0.1),
+                startRadius: 0,
+                endRadius: 190
+            )
+            .frame(height: 96)
+            .allowsHitTesting(false)
         }
     }
 }
