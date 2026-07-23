@@ -38,7 +38,7 @@ bug it exists to fix).
 |---|---|---|---|
 | 0 | Scaffold + privacy gate | ✅ done | Repo bootstrapped; privacy gate blocking on every commit |
 | 1 | Core app + Codex | ✅ done | Builds, launches to menubar, real Codex usage + pace verdict |
-| 2 | Claude provider | 🟡 in-prog | Code complete + tested; awaiting a real token to verify live |
+| 2 | Claude provider | 🟡 in-prog | Full-scope PKCE built + tested; awaiting user's one-time sign-in |
 | 3 | Distribution | ⏸ pending | Signed, notarized, Sparkle auto-update, published to Releases |
 | 4 | CI | ⏸ pending | `macos-latest` workflow running build + test + lint + privacy |
 

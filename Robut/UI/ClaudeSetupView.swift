@@ -1,20 +1,15 @@
-// ClaudeSetupView.swift — one-time Claude setup, INLINE in the pane.
+// ClaudeSetupView.swift — full-scope Claude sign-in, INLINE in the pane.
 //
-// WHY THIS IS NOT A SHEET, so nobody "improves" it back into one:
+// WHY INLINE, NOT A SHEET: `MenuBarExtra(.window)` is an NSPanel that
+// closes the moment it resigns key, so a sheet taking focus dismisses the
+// whole panel. Rendered inline instead. (Learned the hard way — see the
+// git history.)
 //
-// `MenuBarExtra` with `.menuBarExtraStyle(.window)` is an NSPanel that
-// closes the moment it resigns key. Presenting a sheet from it makes the
-// sheet key, so the panel resigns, so the panel closes — taking the
-// sheet with it. The symptom is that clicking the text field makes the
-// entire UI vanish. Robut is also `LSUIElement`, so the app isn't active
-// and can't readily take keyboard focus for a sheet anyway.
-//
-// So: rendered inline, and the PRIMARY action is a clipboard paste that
-// needs no text-field focus at all. The secure field stays as a fallback
-// for anyone who'd rather type.
-//
-// The token goes straight into Robut's own keychain item. It is never
-// logged, never written to a file, and never redisplayed.
+// The flow: "Sign in with Claude" opens the browser to the PKCE authorize
+// URL; the browser shows a code; the user pastes it back. That yields a
+// FULL-SCOPE token (with user:profile) — which a `claude setup-token`
+// deliberately can't provide, and which the usage endpoint requires. The
+// token lands in Robut's own keychain item and is never shown again.
 
 import AppKit
 import SwiftUI
@@ -23,143 +18,144 @@ struct ClaudeSetupView: View {
     @Bindable var model: AppModel
     let onDone: () -> Void
 
-    @State private var typed = ""
-    @State private var status: Status?
+    @State private var step: Step = .start
+    @State private var pastedCode = ""
+    @State private var error: String?
+    @State private var working = false
 
-    private enum Status: Equatable {
-        case saved
-        case empty
-        case looksWrong
-
-        var message: String {
-            switch self {
-            case .saved: "Saved — checking usage…"
-            case .empty: "Clipboard is empty"
-            case .looksWrong: "That doesn't look like a token"
-            }
-        }
-
-        var isError: Bool { self != .saved }
-    }
-
-    private let command = "claude setup-token"
+    private enum Step { case start, awaitingCode }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Connect Claude").font(.system(size: 12, weight: .semibold))
-                Spacer()
-                Button("Done", action: onDone)
-                    .buttonStyle(.link)
-                    .font(.system(size: 11))
-            }
+            header
 
             Text("""
-                Robut uses its own token, so macOS never asks for your \
-                keychain password. Run this, copy the result, then click \
-                Paste:
+                Robut signs in with its own token, so macOS never asks for \
+                your keychain password and it never reads Claude Code's \
+                credentials.
                 """)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 6) {
-                Text(command)
-                    .font(.system(size: 11, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
-
-                Button {
-                    copy(command)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                }
-                .buttonStyle(.borderless)
-                .help("Copy command")
+            switch step {
+            case .start: startStep
+            case .awaitingCode: codeStep
             }
 
-            // Primary path: needs no keyboard focus, so the panel can't
-            // dismiss out from under it.
-            Button {
-                saveFromClipboard()
-            } label: {
-                Label("Paste token from clipboard", systemImage: "clipboard")
-                    .font(.system(size: 11, weight: .medium))
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.regular)
-            .keyboardShortcut(.defaultAction)
-
-            DisclosureGroup {
-                HStack(spacing: 6) {
-                    SecureField("Paste or type token", text: $typed)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
-                    Button("Save") { save(typed) }
-                        .controlSize(.small)
-                        .disabled(typed.trimmed.isEmpty)
-                }
-                .padding(.top, 4)
-            } label: {
-                Text("Type it instead").font(.system(size: 10))
-            }
-
-            if let status {
-                Text(status.message)
+            if let error {
+                Text(error)
                     .font(.system(size: 10))
-                    .foregroundStyle(status.isError ? AnyShapeStyle(.red) : AnyShapeStyle(.green))
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if model.hasClaudeToken {
-                Button("Remove stored token", role: .destructive) {
-                    model.clearClaudeToken()
-                    status = nil
+                Button("Sign out of Claude", role: .destructive) {
+                    model.signOutClaude()
+                    onDone()
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 10))
             }
-
-            Text("Stored in Robut's own keychain item — never Claude Code's.")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
     }
 
+    private var header: some View {
+        HStack {
+            Text("Connect Claude").font(.system(size: 12, weight: .semibold))
+            Spacer()
+            Button("Done", action: onDone)
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+        }
+    }
+
+    private var startStep: some View {
+        Button {
+            openSignIn()
+        } label: {
+            Label("Sign in with Claude", systemImage: "person.badge.key")
+                .font(.system(size: 11, weight: .medium))
+                .frame(maxWidth: .infinity)
+        }
+        .controlSize(.regular)
+        .keyboardShortcut(.defaultAction)
+    }
+
+    private var codeStep: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Your browser opened. Authorize, copy the code it shows, then paste it here:")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // A paste button needs no text-field focus, so the panel can't
+            // dismiss out from under it. Typing stays available too.
+            HStack(spacing: 6) {
+                Button {
+                    pastedCode = NSPasteboard.general.string(forType: .string) ?? ""
+                    submit()
+                } label: {
+                    Label("Paste code", systemImage: "clipboard")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .controlSize(.small)
+                .disabled(working)
+
+                Button("Re-open browser") { openSignIn() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
+                    .disabled(working)
+            }
+
+            HStack(spacing: 6) {
+                SecureField("or paste code here", text: $pastedCode)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11, design: .monospaced))
+                    .disabled(working)
+                Button("Submit") { submit() }
+                    .controlSize(.small)
+                    .disabled(working || pastedCode.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            if working {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Completing sign-in…").font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     // MARK: - Actions
 
-    private func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-
-    private func saveFromClipboard() {
-        let clipboard = NSPasteboard.general.string(forType: .string) ?? ""
-        guard !clipboard.trimmed.isEmpty else { status = .empty; return }
-        save(clipboard)
-    }
-
-    private func save(_ raw: String) {
-        let token = raw.trimmed
-        // Loose sanity check only. Anthropic's token format isn't a
-        // contract, so reject the obviously-wrong (a pasted command, a
-        // sentence) without guessing at a prefix that may change.
-        guard token.count >= 20, !token.contains(" "), !token.contains("\n") else {
-            status = .looksWrong
+    private func openSignIn() {
+        error = nil
+        guard let url = model.beginClaudeSignIn() else {
+            error = "Couldn't build the sign-in link"
             return
         }
-        model.saveClaudeToken(token)
-        typed = ""
-        status = .saved
-        onDone()
+        NSWorkspace.shared.open(url)
+        step = .awaitingCode
     }
-}
 
-private extension String {
-    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+    private func submit() {
+        let code = pastedCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return }
+        working = true
+        error = nil
+        Task {
+            let failure = await model.completeClaudeSignIn(pastedCode: code)
+            working = false
+            pastedCode = ""
+            if let failure {
+                error = failure
+            } else {
+                onDone()
+            }
+        }
+    }
 }

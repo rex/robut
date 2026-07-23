@@ -210,31 +210,10 @@ final class AppModel {
         await refresh()
     }
 
-    // MARK: - Claude token
-
-    /// Whether Robut holds a Claude token. Reads its OWN keychain item,
-    /// so this never prompts.
-    var hasClaudeToken: Bool { RobutKeychain.has(.claudeToken) }
-
-    /// Store a token from `claude setup-token`. The value is never
-    /// logged, echoed, or written anywhere but the keychain.
-    func saveClaudeToken(_ token: String) {
-        do {
-            try RobutKeychain.write(token, to: .claudeToken)
-            Log.auth.notice("claude token stored")
-        } catch {
-            Log.auth.error("failed to store claude token")
-        }
-        // A new token is exactly the user action that clears a
-        // `.userAction` back-off.
-        Task { await retryNow() }
-    }
-
-    func clearClaudeToken() {
-        try? RobutKeychain.delete(.claudeToken)
-        Log.auth.notice("claude token removed")
-        Task { await retryNow() }
-    }
+    /// PKCE for the in-flight Claude sign-in. Held only between opening
+    /// the browser and pasting the code back; never persisted. Not private
+    /// so the sign-in extension (AppModel+ClaudeAuth) can reach it.
+    var pendingPKCE: ClaudePKCE?
 
     /// Providers in a non-ready state, for the pane's muted footer rows.
     var unavailable: [(provider: Provider, state: ProviderState)] {

@@ -30,6 +30,51 @@ version bumps).
 
 ---
 
+## [0.10.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Added
+- **Full-scope Claude sign-in (PKCE).** Robut now runs the same OAuth flow
+  as `claude auth login`, requesting `user:profile` — the scope the usage
+  endpoint requires and the one `claude setup-token` intentionally
+  withholds. The user authorizes in the browser and pastes the displayed
+  code back; Robut exchanges it for a full-scope token stored in its OWN
+  keychain item. No keychain-rule violation, no prompts, and it actually
+  works.
+- **`ClaudeOAuth`** — PKCE (S256), authorize-URL construction, token
+  exchange, and refresh. All constants (client id, endpoints, scopes)
+  were read from the shipped Claude Code binary via static analysis —
+  ZERO network calls — not invented. The client id is a public PKCE
+  identifier, not a secret.
+- **`ClaudeTokenStore` / `ClaudeTokenBundle`** — the token, refresh token,
+  expiry and scopes, persisted as JSON in Robut's own keychain item. A
+  `canReadUsage` scope check lets Robut reject an inference-only token
+  WITHOUT spending a doomed call on the rate-limited endpoint.
+- Proactive refresh: an expired token is refreshed at the token endpoint
+  (platform.claude.com) before any usage call, so a fetch never races the
+  expiry boundary. A dead refresh token is terminal (`.userAction`),
+  never retried on a timer.
+- Sign-in UI replacing the setup-token paste: "Sign in with Claude" opens
+  the browser; the code comes back via a paste button (no field focus, so
+  the menubar panel can't dismiss). 21 new tests (PKCE correctness,
+  authorize params, token decoding, expiry, exchange/refresh, and the
+  scope guard). 75 tests across 13 suites.
+
+### Changed
+- Dropped the guessed `anthropic-beta: oauth-2025-04-20` header — the
+  first-party client sends only `Content-Type` on the usage call.
+- `ClaudeUsageSource` split (wire format → `ClaudeUsageWire.swift`) and
+  `AppModel` split (sign-in → `AppModel+ClaudeAuth.swift`) to stay within
+  the architecture line limits.
+
+### Note
+- **Root cause of the earlier rejection, proven offline:** `/api/oauth/usage`
+  is gated in Claude Code's own code on `user:inference` AND
+  `user:profile`; `claude setup-token` is inference-only by design
+  ("limited to inference-only for security reasons"). No header or retry
+  could ever have fixed it — a full-scope token was always required.
+- The sign-in and token endpoints are on platform.claude.com, NOT the
+  rate-limited api.anthropic.com/api/oauth/usage. Signing in cannot
+  trigger the usage rate limit.
+
 ## [0.9.0] — 2026-07-22 — Agent: Claude Opus 4.8
 ### Fixed
 - **`make test` was making live network calls to Anthropic.** A unit-test

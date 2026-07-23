@@ -167,7 +167,7 @@ struct ClaudeCLISourceTests {
         let payload = #"{"five_hour":{"utilization":11,"resets_at":1800005000}}"#
         let composite = ClaudeCompositeSource(
             token: ClaudeUsageSource(
-                token: { "synthetic" },
+                store: syntheticClaudeStore(token: "synthetic"),
                 authStatus: { nil },
                 session: StubURLProtocol.stub(status: 200, json: payload)
             ),
@@ -183,7 +183,7 @@ struct ClaudeCLISourceTests {
         guard ClaudeCLI.isInstalled else { return }
         let composite = ClaudeCompositeSource(
             token: ClaudeUsageSource(
-                token: { "rejected" },
+                store: syntheticClaudeStore(token: "rejected"),
                 authStatus: { nil },
                 session: StubURLProtocol.stub(status: 401, json: "{}")
             ),
@@ -201,7 +201,7 @@ struct ClaudeCLISourceTests {
         let cliWasCalled = CallFlag()
         let composite = ClaudeCompositeSource(
             token: ClaudeUsageSource(
-                token: { "synthetic" },
+                store: syntheticClaudeStore(token: "synthetic"),
                 authStatus: { nil },
                 session: StubURLProtocol.stub(status: 429, json: "{}")
             ),

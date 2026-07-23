@@ -55,10 +55,11 @@ struct ClaudeUsageSourceTests {
         status: Int = 200,
         headers: [String: String] = [:],
         token: String? = "synthetic-token",
+        scopes: [String] = ["user:inference", "user:profile"],
         authStatus: ClaudeCLI.AuthStatus? = nil
     ) -> ClaudeUsageSource {
         ClaudeUsageSource(
-            token: { token },
+            store: syntheticClaudeStore(token: token, scopes: scopes),
             authStatus: { authStatus },
             session: StubURLProtocol.stub(status: status, json: json, headers: headers)
         )
@@ -194,10 +195,27 @@ struct ClaudeUsageSourceTests {
         ).fetch(now: t0)
 
         guard case .failed(let reason, let retry) = state else {
-            Issue.record("Expected .failed prompting for setup-token"); return
+            Issue.record("Expected .failed prompting for sign-in"); return
         }
-        #expect(reason.contains("setup-token"))
-        // Nothing to poll for — only the user adding a token changes this.
+        #expect(reason.lowercased().contains("sign in"))
+        // Nothing to poll for — only the user signing in changes this.
+        #expect(retry == .userAction)
+    }
+
+    @Test("An inference-only token is rejected WITHOUT calling the endpoint")
+    func inferenceOnlyTokenNeverCallsEndpoint() async {
+        // The crux of the whole saga: a token missing user:profile cannot
+        // read usage, and Robut must know that from the scopes rather than
+        // spending a doomed call on the rate-limited endpoint. The stub is
+        // set to 200, so if the endpoint were called the test would read
+        // as ready — it must instead short-circuit to .userAction.
+        let state = await source(
+            json: fullPayload, status: 200, scopes: ["user:inference"]
+        ).fetch(now: t0)
+
+        guard case .failed(_, let retry) = state else {
+            Issue.record("Expected .failed for an inference-only token"); return
+        }
         #expect(retry == .userAction)
     }
 
