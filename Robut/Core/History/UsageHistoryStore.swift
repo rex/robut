@@ -11,9 +11,11 @@ import Foundation
 
 actor UsageHistoryStore {
 
-    /// Samples older than this are dropped. Two weeks comfortably covers a
-    /// 7-day window plus the previous one for context.
-    static let retention: TimeInterval = 14 * 24 * 3600
+    /// Samples older than this are dropped. Five weeks holds several
+    /// completed 7-day epochs, which is what lets the pace engine learn
+    /// how much of past windows was actually consumed before reset
+    /// (`PacePattern.priorEpochPeaks`).
+    static let retention: TimeInterval = 35 * 24 * 3600
 
     /// Don't record a sample if usage hasn't moved and the last one is
     /// recent — otherwise an idle machine writes a line every minute

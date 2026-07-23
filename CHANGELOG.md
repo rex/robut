@@ -30,6 +30,36 @@ version bumps).
 
 ---
 
+## [0.17.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Fixed
+- **The low-usage false red alarm** — a weekly at 7% used showed "Runs dry
+  ~1d 20h early". Root cause: the 90-minute active slope (right for a 5-hour
+  session) was extrapolated across a ~158-hour horizon as if usage never
+  stops for sleep or idle days.
+### Added
+- **Two-regime pace engine.** Windows with <24h to reset keep the existing
+  sharp engine, byte-for-byte. Windows ≥24h out are projected from the
+  **lived rate** (`PacePattern.livedRate`): consumption per wall-clock hour
+  over up to 72h of history, straight across reset boundaries — nights and
+  idle days are in the denominator, so sleep lets the pace marker catch up.
+- **Evidence gating**: a `.shortfall` claim about a multi-day window now
+  requires ≥24h of lived evidence (a full day-night cycle). Thinner
+  evidence demotes: gold `.tight` if measurably ahead of the even-pace
+  marker, otherwise "Measuring pace…" — never red off a hot morning.
+- **Week-over-week learning** (`PacePattern.priorEpochPeaks`): completed
+  past epochs report how much was actually consumed before reset; the
+  projection blends toward the heaviest recent peak (weight grows with
+  epochs seen, capped at half). History retention raised 14d → 35d so
+  several weekly epochs persist to learn from.
+- 12 new tests (71 total): the live repro, fresh-install honesty, hot-streak
+  nudge, preserved true alarms, prior-week tempering, session sharpness,
+  and the `PacePattern` primitives.
+### Changed
+- Detail line reads "X%/hr pace" (a lived average on long windows), not
+  "X%/hr now".
+- The mood glow wash now spans the panel's full height and fades naturally
+  instead of cutting off at a 96px seam.
+
 ## [0.16.1] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Changed
 - AGENTS.md §9: record two durable invariants from the design-system

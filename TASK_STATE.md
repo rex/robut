@@ -110,18 +110,29 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 3. Blockers / open questions
 
-- **CONFIRMED (2026-07-23): a LOW-usage window shows red `.shortfall`.** Seen
-  live during the v0.16.0 visual check: Claude **Weekly at 7% used** →
-  "Runs dry ~1d 20h early" with `<1%/hr now · <1%/hr sustainable`. So it is
-  NOT a churny-debug artifact; it recurs in normal use. It's a `PaceEngine`
-  projection problem at tiny rates (dividing by a near-zero sustainable rate,
-  or a noisy least-squares slope on a nearly-flat, low-fraction series) — a
-  false alarm that undermines the app's core promise. Fix: write a failing
-  test (a low-fraction, low-rate window must read `.idle`/`.comfortable`, never
-  `.shortfall`), then correct the fit/threshold in `Core/Pace`. NOT the new UI.
+- ~~Low-usage window shows red `.shortfall`~~ **RESOLVED (v0.17.0).** Root
+  cause was the 90-minute active slope extrapolated across a multi-day
+  horizon (assumes no sleep). Fixed with the two-regime engine — see §4.
+- **Watch (v0.17.0):** with thin per-window-id history, long windows read
+  "Measuring pace…" until 24h of lived evidence accumulates (seen live on
+  Claude Weekly/Fable, whose ids are ~1 day old). Expected to self-resolve.
+  If lived pace genuinely stays above sustainable once representative, the
+  window CAN go gold/red — that is now a true alarm, not a false one; the
+  trailing-72h basis lets anomalous days (e.g. the rate-limit debugging
+  marathon) roll out naturally. Tuning knobs live in
+  `PaceEngine+LongHorizon.swift` if real weeks show the constants are off.
 
 ## 4. Recent decisions (append-only, newest first)
 
+- 2026-07-23 — **Two-regime pace engine (v0.17.0).** The question "will I
+  make it to reset?" is answered differently by horizon: <24h to reset →
+  the original 90-min-slope engine (sessions stay sharp); ≥24h → projected
+  from the LIVED rate (consumption per wall-clock hour over ≤72h,
+  cross-reset — sleep/idle in the denominator), tempered by prior-epoch
+  peaks (what past weeks actually consumed; retention now 35d), with red
+  gated on ≥24h of lived evidence (else "Measuring pace…"/tight). Files:
+  `Core/Pace/PacePattern.swift`, `Core/Pace/PaceEngine+LongHorizon.swift`.
+  This surface is the product — the forgiveness model is user-directed.
 - 2026-07-23 — **Integrated the Robut Design System** (claude.ai design
   project, via the DesignSync tool). Ported tokens into a Swift `Theme`
   (`Robut/UI/Theme/`), with the four status colours SOURCED FROM
@@ -147,11 +158,11 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 5. Next actions (ordered)
 
-1. **Fix the low-usage `.shortfall` false alarm** (§3) — CONFIRMED in normal
-   use. Touches `Core/Pace`; write the failing test first.
-2. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon (no asset
+1. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon (no asset
    catalog yet; `AppIcon` is referenced in `project.yml` but absent).
-3. CI (`macos-latest`: build + test + lint + privacy).
+2. CI (`macos-latest`: build + test + lint + privacy).
+3. Watch the long-horizon verdicts over real days (§3) — tune
+   `PaceEngine+LongHorizon` constants only against observed weeks.
 4. Optional: import the remaining brand PNGs (mascot/wordmark/lockups) into an
    asset catalog for onboarding/marketing surfaces — fonts are already
    vendored, but the PNGs still live only in the design project.

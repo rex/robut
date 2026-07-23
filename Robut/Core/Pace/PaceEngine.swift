@@ -141,6 +141,14 @@ enum PaceEngine {
         let hoursToReset = secondsToReset / 3600
         let safePerHour = remaining / hoursToReset
 
+        // A window more than a day out is projected from LIVED history —
+        // nights and idle days included — not from the last 90 minutes.
+        // Extrapolating an active-morning slope across a week assumes the
+        // human never sleeps; see PaceEngine+LongHorizon.swift.
+        if secondsToReset >= Self.longHorizon {
+            return longHorizonVerdict(window: window, samples: samples, now: now, safePerHour: safePerHour)
+        }
+
         // `now` is itself an observation: the fetch we just did reported
         // this window's current usage, so treat it as a sample.
         //

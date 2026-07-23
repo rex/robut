@@ -6,9 +6,9 @@
 - **Project**: Robut — macOS menubar AI-usage tracker (Swift 6 / SwiftUI /
   xcodegen). Shows Claude + Codex usage with burn-rate projection.
 - **Active branch**: `main`
-- **Version**: v0.16.0 — design system integrated; all gates green.
+- **Version**: v0.17.0 — two-regime pace engine; all gates green (71 tests).
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
-- **Last session**: 2026-07-23 (Claude Opus 4.8). Design-system integration.
+- **Last session**: 2026-07-23 (Claude Opus 4.8). Pace-engine forgiveness.
 
 ## Current state (one line)
 
@@ -19,20 +19,20 @@ groups, SegmentMeters, an answer-first summary, and the per-bar pace marker.
 
 ## Last decisions
 
+- 2026-07-23 **Two-regime pace engine** (v0.17.0): <24h to reset = original
+  sharp engine; ≥24h = LIVED rate over ≤72h (sleep/idle in the denominator)
+  + prior-epoch peak learning (retention 35d) + red gated on ≥24h evidence.
+  Fixed the 7%-weekly false red; glow wash now spans the full pane.
 - 2026-07-23 Integrated the Robut Design System (claude.ai design project):
   a Swift `Theme` (status colours sourced from `RobotMood.nsTint`), self-hosted
   Geist/Geist Mono, and a full pane rebuild + the pace marker. v0.16.0.
 - 2026-07-23 Claude = the `claude` CLI, sole source; OAuth/token/keychain
   layer was built then DELETED (~1,650 lines). Robut holds zero credentials.
-- 2026-07-23 Local dev needs `make signing-init` (stable signing) or the
-  keychain prompt returns.
 
 ## Open blockers
 
-- **Confirmed:** a LOW-usage window shows red `.shortfall` — seen live at
-  Claude Weekly 7% → "Runs dry ~1d 20h early" with `<1%/hr` rates. It's a
-  pace-engine projection artifact at tiny rates, NOT the new UI. See
-  TASK_STATE §3; fixing it touches `Core/Pace` and needs a test.
+- None. (Watch: long windows read "Measuring pace…" until their id has 24h
+  of lived history; verify verdicts over real days — TASK_STATE §3.)
 
 ## How to resume (for a fresh agent)
 

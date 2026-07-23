@@ -173,6 +173,14 @@ change gets a corresponding test update.
 - Claude usage is NOT reliably in `~/.claude` transcripts: the `rateLimits`
   field exists in the schema but is only populated on API errors. Codex
   usage IS fully available on disk (`~/.codex/sessions/**/*.jsonl`).
+- **The pace engine is TWO regimes — don't "unify" them.** <24h to reset
+  uses the 90-minute slope (activity-scale, right for sessions); ≥24h uses
+  the LIVED rate over ≤72h (`PacePattern.livedRate` — wall-clock
+  denominator, so sleep/idle count) plus prior-epoch peaks, with red gated
+  on ≥24h of evidence. Extrapolating the short-lookback slope across a
+  week is precisely the bug that once showed "runs dry ~1d 20h early" at
+  7% used. Also: history retention (35d) exists to feed the prior-epoch
+  learning — don't shorten it back.
 - **Status colours have ONE source of truth: `RobotMood.nsTint`**
   (`RobotFace.swift`). The design tokens mirror it and `Theme.status(_:)`
   surfaces it — so the menubar icon and the pane can't drift. NEVER retune a

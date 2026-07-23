@@ -108,8 +108,9 @@ struct UsagePane: View {
         Rectangle().fill(Theme.Colors.hairline).frame(height: 1)
     }
 
-    /// A faint radial halo in the worst-case status colour at the top of the
-    /// panel, so the signal reads even peripherally. Hidden when dim.
+    /// A faint radial halo in the worst-case status colour, washing from
+    /// the top of the panel across its WHOLE height — it must fade out
+    /// naturally, never end at a visible seam. Hidden when dim.
     @ViewBuilder
     private var glowWash: some View {
         if model.mood != .dim {
@@ -117,9 +118,8 @@ struct UsagePane: View {
                 colors: [Theme.status(model.mood).opacity(0.20), .clear],
                 center: UnitPoint(x: 0.18, y: -0.1),
                 startRadius: 0,
-                endRadius: 190
+                endRadius: 520
             )
-            .frame(height: 96)
             .allowsHitTesting(false)
         }
     }

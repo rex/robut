@@ -33,10 +33,12 @@ enum PaceFormatting {
         }
     }
 
-    /// Secondary line: the actual numbers, for when the headline isn't enough.
+    /// Secondary line: the actual numbers, for when the headline isn't
+    /// enough. "pace", not "now" — on long windows the measured rate is a
+    /// multi-day lived average, not the last few minutes.
     static func detailText(_ verdict: PaceVerdict) -> String? {
         guard let burn = verdict.burnPerHour, burn > 0 else { return nil }
-        let current = "\(percent(burn))/hr now"
+        let current = "\(percent(burn))/hr pace"
         guard verdict.safePerHour.isFinite, verdict.safePerHour > 0 else { return current }
         return "\(current) · \(percent(verdict.safePerHour))/hr sustainable"
     }
