@@ -30,6 +30,14 @@ version bumps).
 
 ---
 
+## [0.15.1] — 2026-07-23 — Agent: Claude Opus 4.8
+### Changed
+- Refreshed `TASK_STATE.md` and `PROGRESS.md` for context compaction:
+  accurate current state (v0.15.0, CLI-based Claude, zero credentials),
+  corrected standing directives, and a spec for the next slice — a per-bar
+  "pace marker" (the on-budget line = elapsed fraction of the window; the
+  math is already available via `UsageWindow.startedAt` / `.length`).
+
 ## [0.15.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Removed
 - **The entire Claude OAuth / token / keychain layer.** By decision, the
