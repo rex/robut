@@ -6,9 +6,9 @@
 - **Project**: Robut — macOS menubar AI-usage tracker (Swift 6 / SwiftUI /
   xcodegen). Shows Claude + Codex usage with burn-rate projection.
 - **Active branch**: `main`
-- **Version**: v0.17.0 — two-regime pace engine; all gates green (71 tests).
+- **Version**: v0.18.0 — statistics capture layer; all gates green (84 tests).
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
-- **Last session**: 2026-07-23 (Claude Opus 4.8). Pace-engine forgiveness.
+- **Last session**: 2026-07-23 (Claude Opus 4.8). Stats capture + matrix.
 
 ## Current state (one line)
 
@@ -19,6 +19,12 @@ groups, SegmentMeters, an answer-first summary, and the per-bar pace marker.
 
 ## Last decisions
 
+- 2026-07-23 **Statistics capture layer** (v0.18.0): `Core/Stats/` scans
+  both transcript stores incrementally into a local ledger — daily token
+  rollups, `/usage` analytics, prompt activity, plan/credits, price table,
+  and tokens-per-percent quota estimates. Display UNBUILT — the handoff is
+  `docs/stats-matrix.md` (also in the design project). Read model:
+  `model.stats.snapshot()`.
 - 2026-07-23 **Two-regime pace engine** (v0.17.0): <24h to reset = original
   sharp engine; ≥24h = LIVED rate over ≤72h (sleep/idle in the denominator)
   + prior-epoch peak learning (retention 35d) + red gated on ≥24h evidence.

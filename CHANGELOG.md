@@ -30,6 +30,38 @@ version bumps).
 
 ---
 
+## [0.18.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Added
+- **The statistics capture layer (`Core/Stats/`)** — Robut now captures
+  every usage statistic available on the machine, all read-only and local:
+  - **Daily token rollups** per day × provider × model × project, scanned
+    incrementally (per-file byte cursors; the multi-GB first scan runs
+    once) from Claude Code transcripts (`usage` per assistant message,
+    `iterations`-aware, subagents tagged) and Codex rollouts (`token_count`
+    cumulative→delta, model/project stickiness). Full cache-tier breakdown
+    (reads, 5m/1h writes) + Codex reasoning tokens.
+  - **The `claude /usage` analytics block** (previously discarded): rolling
+    24h/7d requests + sessions, behavioral traits, top skills/subagents/MCP
+    servers — parsed from the text Robut already fetches; a daily snapshot
+    builds a time series. No extra CLI calls.
+  - **Quota estimates — the tokens-per-percent correlation**: percent-used
+    deltas (usage history) ÷ local tokens consumed in the same interval
+    (hourly series) → "1% ≈ N tokens", the implied absolute window size,
+    and tokens remaining. Median over clean intervals; refuses thin data.
+  - **Prompt activity** per day (prompts, distinct sessions, projects)
+    from `history.jsonl`; **Codex plan/credits** from rate_limits.
+  - **`PriceTable`** — API list prices (snapshot 2026-07) for
+    API-equivalent cost of any slice; cache reads at 10%, writes 1.25×/2×.
+- `UsageStatsStore` actor (persisted ledger + cursors, 10-min throttle,
+  bounded retention), `AppModel` wiring off the refresh path
+  (fire-and-forget, guarded from tests), CLI raw-text forwarding hook.
+- `docs/stats-matrix.md` — the full design handoff (type, depth, breadth,
+  format, caveats per dataset); also pushed to the Robut Design System
+  project.
+- 13 new tests (84 total, 20 suites): scanners (aggregation, dedup,
+  incremental cursors), insights parser, price math, quota estimator,
+  store persistence.
+
 ## [0.17.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Fixed
 - **The low-usage false red alarm** — a weekly at 7% used showed "Runs dry

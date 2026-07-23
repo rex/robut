@@ -173,6 +173,16 @@ change gets a corresponding test update.
 - Claude usage is NOT reliably in `~/.claude` transcripts: the `rateLimits`
   field exists in the schema but is only populated on API errors. Codex
   usage IS fully available on disk (`~/.codex/sessions/**/*.jsonl`).
+- **The stats layer is read-only and cursor-incremental.** `Core/Stats`
+  scanners walk `~/.claude` / `~/.codex` with per-file byte cursors — the
+  multi-gigabyte first scan happens once; never "simplify" to full
+  rescans, and never add writes to provider dirs. Scans run off the
+  refresh path and are guarded by `AppDelegate.isRunningTests` so `make
+  test` never touches real transcript stores. Token counts are THIS
+  machine only — the percent windows stay the account-wide truth; never
+  present local tokens as account usage. Claude's real per-message tokens
+  live in `usage.iterations` (top-level fields are often zero); Codex
+  `token_count` totals are CUMULATIVE per session (delta via cursor).
 - **The pace engine is TWO regimes — don't "unify" them.** <24h to reset
   uses the 90-minute slope (activity-scale, right for sessions); ≥24h uses
   the LIVED rate over ≤72h (`PacePattern.livedRate` — wall-clock

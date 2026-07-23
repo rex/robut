@@ -124,6 +124,17 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 4. Recent decisions (append-only, newest first)
 
+- 2026-07-23 — **Statistics capture layer (v0.18.0).** `Core/Stats/`
+  captures everything locally available: daily token rollups (day × provider
+  × model × project, incremental cursor scans of both transcript stores),
+  the `/usage` analytics block (was discarded), prompt activity, Codex
+  plan/credits, an API price table, and the tokens-per-percent quota
+  correlation (percent deltas ÷ local hourly tokens → absolute window-size
+  estimates). All read-only, all local, fed off the refresh path
+  (`AppModel+Stats`), persisted by the `UsageStatsStore` actor. DISPLAY IS
+  UNBUILT BY DESIGN — `docs/stats-matrix.md` is the handoff to Claude
+  Design (also pushed into the design project); a standalone
+  data-exploration window is under consideration.
 - 2026-07-23 — **Two-regime pace engine (v0.17.0).** The question "will I
   make it to reset?" is answered differently by horizon: <24h to reset →
   the original 90-min-slope engine (sessions stay sharp); ≥24h → projected
@@ -158,12 +169,16 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 5. Next actions (ordered)
 
-1. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon (no asset
+1. **Stats display** — Claude Design has `docs/stats-matrix.md` (also in
+   the design project as `stats-matrix.md`); possibly a standalone
+   data-exploration window. Build only after their design lands. The data
+   is already flowing (`model.stats.snapshot()`).
+2. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon (no asset
    catalog yet; `AppIcon` is referenced in `project.yml` but absent).
-2. CI (`macos-latest`: build + test + lint + privacy).
-3. Watch the long-horizon verdicts over real days (§3) — tune
+3. CI (`macos-latest`: build + test + lint + privacy).
+4. Watch the long-horizon verdicts over real days (§3) — tune
    `PaceEngine+LongHorizon` constants only against observed weeks.
-4. Optional: import the remaining brand PNGs (mascot/wordmark/lockups) into an
+5. Optional: import the remaining brand PNGs (mascot/wordmark/lockups) into an
    asset catalog for onboarding/marketing surfaces — fonts are already
    vendored, but the PNGs still live only in the design project.
 

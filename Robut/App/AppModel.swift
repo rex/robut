@@ -39,7 +39,10 @@ final class AppModel {
     static let shared = AppModel()
 
     private let sources: [any UsageSource]
-    private let history: UsageHistoryStore
+    let history: UsageHistoryStore
+    /// The statistics ledger (token accounting, insights, quota estimates)
+    /// — fed by the refresh loop, read by whatever displays it.
+    let stats: UsageStatsStore
     private var ticker: Task<Void, Never>?
     private var didSeedHistory = false
 
@@ -49,11 +52,23 @@ final class AppModel {
     /// Robut previously got this machine IP-rate-limited by Anthropic.
     private var nextFetchAllowed: [Provider: Date] = [:]
 
-    init(sources: [any UsageSource]? = nil, history: UsageHistoryStore = UsageHistoryStore()) {
+    init(
+        sources: [any UsageSource]? = nil,
+        history: UsageHistoryStore = UsageHistoryStore(),
+        stats: UsageStatsStore = UsageStatsStore()
+    ) {
         // v1 tracks Codex (read from local session files) and Claude (via
         // the `claude` CLI). Robut holds NO credentials of its own for
         // either — Codex is on disk, and the CLI authenticates itself.
-        self.sources = sources ?? [CodexUsageSource(), ClaudeCLIUsageSource()]
+        // The CLI source forwards its raw usage text to the stats ledger
+        // (the analytics block rides along with the limit lines).
+        self.stats = stats
+        self.sources = sources ?? [
+            CodexUsageSource(),
+            ClaudeCLIUsageSource(onUsageText: { text, at in
+                await stats.ingest(usageText: text, at: at)
+            }),
+        ]
         self.history = history
         for source in self.sources { states[source.provider] = .loading }
     }
@@ -156,6 +171,7 @@ final class AppModel {
 
         await recomputeVerdicts(now: now)
         lastRefresh = now
+        scheduleStatsCapture(now: now)
     }
 
     private func recomputeVerdicts(now: Date) async {

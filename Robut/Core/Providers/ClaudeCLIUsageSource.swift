@@ -38,15 +38,21 @@ struct ClaudeCLIUsageSource: UsageSource {
     /// Injectable so tests never spawn a process.
     let run: @Sendable (TimeInterval) async -> String?
     let timeout: TimeInterval
+    /// The raw usage text carries more than the limit lines (the CLI's
+    /// analytics block); forwarded here on every successful fetch so the
+    /// stats layer can capture it without a second CLI call.
+    let onUsageText: (@Sendable (String, Date) async -> Void)?
 
     init(
         timeout: TimeInterval = defaultTimeout,
-        run: (@Sendable (TimeInterval) async -> String?)? = nil
+        run: (@Sendable (TimeInterval) async -> String?)? = nil,
+        onUsageText: (@Sendable (String, Date) async -> Void)? = nil
     ) {
         self.timeout = timeout
         self.run = run ?? { seconds in
             await ClaudeCLI.usageOutput(timeout: seconds)
         }
+        self.onUsageText = onUsageText
     }
 
     /// `claude /usage` is non-deterministic: a given call returns the full
@@ -62,6 +68,7 @@ struct ClaudeCLIUsageSource: UsageSource {
             let text = ClaudeCLI.resultText(fromJSONEnvelope: output) ?? output
             let windows = ClaudeUsageTextParser.windows(from: text, now: now)
             if !windows.isEmpty {
+                await onUsageText?(text, now)
                 return .ready(UsageSnapshot(
                     provider: provider,
                     windows: windows.sorted { $0.kind.order < $1.kind.order },
