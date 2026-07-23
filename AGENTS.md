@@ -35,8 +35,14 @@ created itself — so Robut reads **only its own** keychain item, and never
 make install      # verify Xcode / xcodegen / swiftlint
 make hooks        # install pre-commit hooks (privacy gate)
 make privacy-init # generate .privacy-denylist.local for this machine
+make signing-init # write Local.xcconfig with a STABLE signing identity
 make dev          # build + launch into the menubar
 ```
+
+**`make signing-init` is not optional.** Without it, builds are ad-hoc
+signed, and ad-hoc signatures change every build — which makes macOS
+re-prompt for Robut's own keychain item on every rebuild, i.e. it
+reintroduces the exact bug this app exists to fix. See §9.
 
 ## 3. Commands the agent MUST run before declaring done
 
@@ -105,6 +111,16 @@ change gets a corresponding test update.
   quietly became a request generator and kept an Anthropic rate limit
   alive. `AppDelegate.isRunningTests` blocks it; don't remove it, and
   don't add network calls to app startup that bypass it.
+- **Ad-hoc signing reintroduces the keychain-prompt bug.** An ad-hoc
+  signature's designated requirement is the build's `cdhash`, which
+  changes every build — so macOS treats each rebuild as a different app
+  and re-prompts for Robut's OWN keychain item. Fix: `make signing-init`
+  (stable Developer ID identity in gitignored `Local.xcconfig`). Verify
+  with `codesign -d -r- <app>`: the requirement must be identity-based
+  (`identifier "com.robut.app" and ... <your-team-id>`), NOT `cdhash H"…"`.
+  Also: test/typecheck build with `CODE_SIGNING_ALLOWED=NO` into
+  `DerivedData-test/` so they don't re-sign the runnable app ad-hoc —
+  launch via `make dev`, and don't point them back at `DerivedData/`.
 - **`claude setup-token` is inference-only; it CANNOT read usage.**
   `/api/oauth/usage` is gated (in Claude Code's own binary) on both
   `user:inference` and `user:profile`; setup-token withholds

@@ -36,6 +36,12 @@ SCHEME      ?= $(APP_NAME)
 DEST        ?= platform=macOS,arch=arm64
 CONFIG      ?= Debug
 DERIVED     ?= DerivedData
+# Tests/typecheck build with CODE_SIGNING_ALLOWED=NO, which re-signs the
+# product ad-hoc. If that landed in $(DERIVED), it would clobber the
+# stably-signed app that `make start` launches — and an ad-hoc build
+# reintroduces the keychain-prompt bug. So they build into a SEPARATE
+# path and never touch the runnable product.
+DERIVED_TEST ?= $(DERIVED)-test
 BUILT_APP   := $(DERIVED)/Build/Products/$(CONFIG)/$(APP_NAME).app
 # Monotonic build number; agrees between local Xcode builds and CI.
 BUILD_NUM   := $(shell git rev-list --count HEAD 2>/dev/null || echo 1)
@@ -223,7 +229,7 @@ typecheck: regenerate
 	@echo "$(CYAN)Type-checking (swiftc under Swift 6 strict concurrency)...$(RESET)"
 	@set -o pipefail; $(XCODEBUILD) -project $(PROJECT) -scheme $(SCHEME) \
 		-configuration $(CONFIG) -destination '$(DEST)' \
-		-derivedDataPath $(DERIVED) \
+		-derivedDataPath $(DERIVED_TEST) \
 		CODE_SIGNING_ALLOWED=NO \
 		build $(FMT)
 	@echo "$(GREEN)Type check clean.$(RESET)"
@@ -265,7 +271,7 @@ test:
 			$(MAKE) --no-print-directory regenerate; \
 			set -o pipefail; $(XCODEBUILD) -project $(PROJECT) -scheme $(SCHEME) \
 				-configuration $(CONFIG) -destination '$(DEST)' \
-				-derivedDataPath $(DERIVED) \
+				-derivedDataPath $(DERIVED_TEST) \
 				CODE_SIGNING_ALLOWED=NO \
 				test $(FMT) ;; \
 		deferred|not_applicable) \

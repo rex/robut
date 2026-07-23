@@ -52,3 +52,4 @@ Carthage/
 
 # --- macOS noise ---
 .DS_Store
+DerivedData-test/

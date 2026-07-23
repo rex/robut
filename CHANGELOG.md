@@ -30,6 +30,20 @@ version bumps).
 
 ---
 
+## [0.11.1] — 2026-07-23 — Agent: Claude Opus 4.8
+### Fixed
+- Tests and typecheck build with `CODE_SIGNING_ALLOWED=NO`, which re-signs
+  the product ad-hoc. They now build into a separate `DerivedData-test/`
+  so they can't clobber the stably-signed runnable app that `make start`
+  launches — otherwise a `make test` between build and launch silently
+  reintroduced an ad-hoc binary (and the keychain prompt). Proven: the
+  runnable app's Team identifier is unchanged after `make test`.
+
+### Changed
+- `AGENTS.md`: `make signing-init` is now a documented, required setup
+  step, with the ad-hoc-signing gotcha and how to verify a stable
+  designated requirement.
+
 ## [0.11.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Fixed
 - **Robut prompted for the keychain password — the exact bug it exists to
