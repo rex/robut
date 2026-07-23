@@ -140,8 +140,16 @@ final class AppModel {
         }
 
         for (provider, state) in results {
-            states[provider] = state
             applyBackoff(state.retryPolicy, to: provider, at: now)
+            // A transient failure (retry `.after`) must not blank real data
+            // — a flaky source like the CLI shouldn't make the rows vanish.
+            // Keep the last-good snapshot; the "updated Nm ago" footer shows
+            // it's aging. `.userAction` and `.notConfigured` DO replace it,
+            // because those are states the user needs to see and act on.
+            if case .failed(_, .after) = state, states[provider]?.snapshot != nil {
+                continue
+            }
+            states[provider] = state
             if let snapshot = state.snapshot {
                 await history.record(snapshot)
             }
@@ -175,29 +183,6 @@ final class AppModel {
             "verdicts=\(count, privacy: .public) outlooks=[\(summary, privacy: .public)]"
         )
     }
-
-    // MARK: - Derived state
-
-    /// Every window Robut currently knows about, worst pace first — this
-    /// is the binding constraint, and what the menubar reflects.
-    var allWindows: [UsageWindow] {
-        states.values
-            .compactMap(\.snapshot)
-            .flatMap(\.windows)
-            .sorted { lhs, rhs in
-                let left = verdicts[lhs.id]?.outlook.severity ?? 0
-                let right = verdicts[rhs.id]?.outlook.severity ?? 0
-                if left != right { return left > right }
-                return lhs.kind.order < rhs.kind.order
-            }
-    }
-
-    var worstOutlook: PaceOutlook? {
-        allWindows.compactMap { verdicts[$0.id]?.outlook }
-            .max { $0.severity < $1.severity }
-    }
-
-    var mood: RobotMood { RobotMood(outlook: worstOutlook) }
 
     // MARK: - Back-off
 

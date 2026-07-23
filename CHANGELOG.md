@@ -30,6 +30,39 @@ version bumps).
 
 ---
 
+## [0.14.0] — 2026-07-23 — Agent: Claude Opus 4.8
+### Fixed
+- **Windows are grouped by provider.** All of a provider's rows are now
+  contiguous (Claude's together, Codex's together) instead of
+  interleaved; providers ordered worst-pace first, session before weekly
+  within each.
+- **Weekly reset time was wrong** ("Thu 10:17" — the window-length
+  fallback). The data comes from `claude /usage`, whose resets are
+  ABSOLUTE ("resets Jul 30 at 3am (America/Chicago)") and often on the
+  hour with NO minutes ("3am", not "3:00am"). The parser only read
+  relative times and required HH:MM, so it fell back. It now parses the
+  absolute form (optional minutes, stated timezone, inferred year).
+- **Fable (and Sonnet) weekly rows were missing.** The CLI labels them
+  "Current week (Fable)" / "(Sonnet)"; the parser didn't recognize those.
+  It now classifies session / week (all models) / Opus / Sonnet / Fable
+  precisely — and, crucially, does NOT mistake stat lines like "55% of
+  your usage came from … sessions" for a window.
+
+### Changed
+- **`claude /usage` is non-deterministic** — ~1 in 3 calls returns a
+  partial output with no limit lines (this is what an earlier
+  investigation mistook for the command being "not viable"). The CLI
+  source now retries up to 4×, and a run that never yields limit lines
+  returns a TRANSIENT failure. AppModel keeps the last-good snapshot on a
+  transient failure, so flaky runs no longer blank the rows; the composite
+  surfaces the CLI's own state when the CLI is the operative path.
+
+### Note
+- Robut's Claude data is currently served by the CLI path: the token
+  (OAuth) path stopped serving — its refresh needs a look, or a
+  re-sign-in. The CLI needs no token and now works reliably. A decision
+  on which should be primary is worth making (see chat).
+
 ## [0.13.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Changed
 - **Reset times are now styled by window length, matching the Claude Code

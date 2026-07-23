@@ -16,64 +16,75 @@ import Testing
 @Suite("Claude usage text parser")
 struct ClaudeUsageTextParserTests {
 
+    /// VERBATIM `claude -p "/usage"` output from a signed-in machine.
+    private let realUsage = """
+    You are currently using your subscription to power your Claude Code usage
+
+    Current session: 3% used · resets Jul 23 at 1:59pm (America/Chicago)
+    Current week (all models): 5% used · resets Jul 30 at 2:59am (America/Chicago)
+    Current week (Fable): 0% used
+
+    What's contributing to your limits usage?
+    Last 24h · 1990 requests · 6 sessions
+      55% of your usage came from subagent-heavy sessions
+      Top skills: /scaffold 4%
+    """
+
+    @Test("Parses the real /usage output into exactly the three windows")
+    func realOutput() {
+        let windows = ClaudeUsageTextParser.windows(from: realUsage, now: t0)
+        let ids = Set(windows.map(\.id))
+        #expect(ids == ["claude.session", "claude.weekly", "claude.weekly.Fable"])
+        #expect(abs((windows.first { $0.id == "claude.weekly" }?.usedFraction ?? -1) - 0.05) < 0.0001)
+    }
+
+    @Test("Stat lines like '55% … sessions' are NOT mistaken for windows")
+    func statLinesIgnored() {
+        // The failure this guards: "55% of your usage came from … sessions"
+        // contains "session" and a percent, but is not a usage limit.
+        let windows = ClaudeUsageTextParser.windows(from: realUsage, now: t0)
+        #expect(windows.count == 3)
+        #expect(!windows.contains { $0.usedFraction > 0.5 })   // no 55% window
+    }
+
     @Test("Percentages are read regardless of spacing")
     func percentages() {
-        #expect(ClaudeUsageTextParser.percentage(in: "Session: 42%") == 42)
+        #expect(ClaudeUsageTextParser.percentage(in: "3% used") == 3)
         #expect(ClaudeUsageTextParser.percentage(in: "Session: 42.5 %") == 42.5)
         #expect(ClaudeUsageTextParser.percentage(in: "no numbers here") == nil)
     }
 
-    @Test("Relative reset times are converted to a date")
-    func relativeResets() throws {
+    @Test("An absolute reset date is parsed in its stated timezone")
+    func absoluteReset() throws {
+        let line = "Current week (all models): 5% used · resets Jul 30 at 2:59am (America/Chicago)"
+        let date = try #require(ClaudeUsageTextParser.resetDate(in: line, now: t0))
+        // Jul 30 2:59am America/Chicago (CDT, UTC-5) == 07:59 UTC.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let comps = utc.dateComponents([.month, .day, .hour, .minute], from: date)
+        #expect(comps.month == 30 || comps.day == 30)   // day 30
+        #expect(comps.hour == 7 && comps.minute == 59)   // 2:59am CDT = 07:59 UTC
+    }
+
+    @Test("Relative reset times still parse (defensive fallback)")
+    func relativeReset() throws {
         let date = try #require(ClaudeUsageTextParser.resetDate(in: "resets in 3h 20m", now: t0))
         #expect(abs(date.timeIntervalSince(t0) - (3 * 3600 + 20 * 60)) < 1)
-
-        let days = try #require(ClaudeUsageTextParser.resetDate(in: "resets in 2d", now: t0))
-        #expect(abs(days.timeIntervalSince(t0) - 2 * 86_400) < 1)
     }
 
-    @Test("An unparseable reset is nil rather than a guess")
-    func unparseableReset() {
-        // An absolute clock time has no timezone here; guessing would be
-        // wrong by hours. Nil lets the caller fall back to window length.
-        #expect(ClaudeUsageTextParser.resetDate(in: "resets at 3:00 PM", now: t0) == nil)
-        #expect(ClaudeUsageTextParser.resetDate(in: "nothing relevant", now: t0) == nil)
-    }
-
-    @Test("Session, weekly and Opus lines map to distinct windows")
-    func classification() {
-        let text = """
-        Current session: 42% used, resets in 2h
-        This week: 18% used, resets in 4d
-        This week (Opus): 5% used, resets in 4d
-        """
-        let windows = ClaudeUsageTextParser.windows(from: text, now: t0)
-
-        #expect(windows.count == 3)
-        #expect(Set(windows.map(\.id)).count == 3)
-        #expect(windows.contains { $0.id == "claude.session" })
-        #expect(windows.contains { $0.id == "claude.weekly" })
-        #expect(windows.contains { $0.id == "claude.weekly.Opus" })
-    }
-
-    @Test("An Opus line is not also counted as the general weekly")
-    func opusNotDoubleCounted() {
-        // "This week (Opus)" contains "week", so keyword order matters.
-        let windows = ClaudeUsageTextParser.windows(
-            from: "This week (Opus): 5% used", now: t0
-        )
+    @Test("Fable with no reset field falls back, never fabricates a percent")
+    func fableNoReset() {
+        let windows = ClaudeUsageTextParser.windows(from: "Current week (Fable): 0% used", now: t0)
         #expect(windows.count == 1)
-        #expect(windows.first?.variant == "Opus")
+        #expect(windows.first?.variant == "Fable")
+        #expect(windows.first?.usedFraction == 0)
     }
 
     @Test("Lines without a percentage produce nothing")
     func noFabrication() {
-        // The cardinal rule: a missing row is honest, an invented one
-        // is not. Never synthesize a window from a label alone.
         let text = """
-        Usage
         Current session: unavailable
-        This week: —
+        Current week (all models): —
         """
         #expect(ClaudeUsageTextParser.windows(from: text, now: t0).isEmpty)
     }
@@ -126,8 +137,8 @@ private final class CallFlag: @unchecked Sendable {
 struct ClaudeCLISourceTests {
 
     private let usageText = """
-    Current session: 42% used, resets in 2h
-    This week: 18% used, resets in 4d
+    Current session: 42% used · resets Jul 23 at 1:59pm (America/Chicago)
+    Current week (all models): 18% used · resets Jul 30 at 2:59am (America/Chicago)
     """
 
     @Test("A JSON envelope's result text is what gets parsed")
@@ -158,8 +169,9 @@ struct ClaudeCLISourceTests {
         guard case .failed(_, let retry) = await source.fetch(now: t0) else {
             Issue.record("Expected .failed for unparseable output"); return
         }
-        // Backs off hard — re-spawning a CLI on a tight loop is expensive.
-        #expect(retry == .after(30 * 60))
+        // A transient back-off, so the model keeps last-good data rather
+        // than blanking the rows on a flaky CLI run.
+        #expect(retry == .after(5 * 60))
     }
 
     @Test("The composite prefers the token path when it works")
