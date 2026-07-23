@@ -173,6 +173,17 @@ change gets a corresponding test update.
 - Claude usage is NOT reliably in `~/.claude` transcripts: the `rateLimits`
   field exists in the schema but is only populated on API errors. Codex
   usage IS fully available on disk (`~/.codex/sessions/**/*.jsonl`).
+- **Status colours have ONE source of truth: `RobotMood.nsTint`**
+  (`RobotFace.swift`). The design tokens mirror it and `Theme.status(_:)`
+  surfaces it — so the menubar icon and the pane can't drift. NEVER retune a
+  status colour in `Theme`; change `nsTint` and the whole app follows. (The
+  design system is a separate claude.ai project, "Robut Design System",
+  synced via the DesignSync tool; it also ships a `SKILL.md`.)
+- **Geist / Geist Mono are self-hosted VARIABLE fonts** (`Robut/Resources/
+  Fonts`, OFL). Exact weights come from the `wght` axis via CoreText
+  (`RobutFont`) because SwiftUI's `.weight()` doesn't drive a variable axis;
+  they're registered once at runtime from `AppDelegate`. Don't swap in
+  `Font.custom(...).weight()` — it renders one weight for all.
 
 ## 10. Workflow
 

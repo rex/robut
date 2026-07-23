@@ -30,6 +30,13 @@ version bumps).
 
 ---
 
+## [0.16.1] — 2026-07-23 — Agent: Claude Opus 4.8
+### Changed
+- AGENTS.md §9: record two durable invariants from the design-system
+  integration — status colours have one source of truth (`RobotMood.nsTint`,
+  never retune in `Theme`), and Geist/Geist Mono are self-hosted variable
+  fonts selected by `wght` axis via CoreText (not `Font.custom(...).weight()`).
+
 ## [0.16.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Added
 - **Design-system foundations in Swift.** Ported the Robut Design System
