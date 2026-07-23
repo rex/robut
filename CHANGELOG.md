@@ -30,6 +30,12 @@ version bumps).
 
 ---
 
+## [0.10.1] — 2026-07-23 — Agent: Claude Opus 4.8
+### Changed
+- `AGENTS.md`: record that `setup-token` is inference-only (can't read
+  usage) and that provider APIs should be diagnosed offline via `strings`
+  on the shipped binary before spending rate-limitable calls.
+
 ## [0.10.0] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Added
 - **Full-scope Claude sign-in (PKCE).** Robut now runs the same OAuth flow

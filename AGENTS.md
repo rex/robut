@@ -105,6 +105,18 @@ change gets a corresponding test update.
   quietly became a request generator and kept an Anthropic rate limit
   alive. `AppDelegate.isRunningTests` blocks it; don't remove it, and
   don't add network calls to app startup that bypass it.
+- **`claude setup-token` is inference-only; it CANNOT read usage.**
+  `/api/oauth/usage` is gated (in Claude Code's own binary) on both
+  `user:inference` and `user:profile`; setup-token withholds
+  `user:profile` by design. Claude usage requires a full-scope token from
+  the browser PKCE flow (`ClaudeOAuth`). Don't reintroduce a setup-token
+  path. Robut rejects an inference-only token from its scopes, without
+  calling the endpoint.
+- **Diagnose provider APIs offline before spending calls.** The Claude
+  Code binary is a native Mach-O with the JS embedded; `strings` reveals
+  endpoints, headers, scopes, and gate logic. That's how the scope
+  requirement above was proven with zero network calls — do that before
+  hitting a rate-limitable endpoint to test a hypothesis.
 - **Never auto-retry an authentication failure.** A rejected credential
   cannot fix itself, so retrying on the refresh timer is not resilience —
   it's a self-inflicted DoS. Robut did exactly this and got the machine
