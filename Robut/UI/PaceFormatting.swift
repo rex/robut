@@ -33,14 +33,15 @@ enum PaceFormatting {
         }
     }
 
-    /// Secondary line: the actual numbers, for when the headline isn't
-    /// enough. "pace", not "now" — on long windows the measured rate is a
-    /// multi-day lived average, not the last few minutes.
-    static func detailText(_ verdict: PaceVerdict) -> String? {
-        guard let burn = verdict.burnPerHour, burn > 0 else { return nil }
-        let current = "\(percent(burn))/hr pace"
-        guard verdict.safePerHour.isFinite, verdict.safePerHour > 0 else { return current }
-        return "\(current) · \(percent(verdict.safePerHour))/hr sustainable"
+    /// The only words left under a bar, and only for the two states the
+    /// meter's marker can't draw: nothing measured yet, and nothing left.
+    /// Everything else is said by the marker.
+    static func qualifier(_ verdict: PaceVerdict?) -> String? {
+        switch verdict?.outlook {
+        case .unknown: "measuring pace…"
+        case .exhausted: "quota spent"
+        default: nil
+        }
     }
 
     /// "2d 4h", "9h", "35m" — coarse on purpose. False precision on an
@@ -89,26 +90,40 @@ enum PaceFormatting {
 
     /// The one-line summary the pane header leads with: worst-case, calm,
     /// and — when something needs attention — it names the binding window.
-    static func summaryText(outlook: PaceOutlook?, window: UsageWindow?) -> String {
-        guard let outlook else { return "Waiting on usage data." }
-        return switch outlook {
+    ///
+    /// Wording tracks the ALARM as well as the outlook. "On pace to run dry
+    /// before reset" over a gold robot is a contradiction: gold means worth
+    /// a glance, and the sentence has to agree with the colour or the pane
+    /// still reads like an alarm panel.
+    static func summaryText(verdict: PaceVerdict?, window: UsageWindow?) -> String {
+        guard let verdict else { return "Waiting on usage data." }
+        let loud = verdict.alarm == .alert
+        return switch verdict.outlook {
         case .unknown: "Measuring pace…"
         case .idle, .comfortable: "You're on track everywhere."
         case .tight: "\(name(window)) is getting tight."
-        case .shortfall: "On pace to run dry before reset."
-        case .exhausted: "\(name(window)) is out of quota."
+        case .shortfall:
+            loud
+                ? "On pace to run dry before reset."
+                : "\(name(window)) is running ahead of pace."
+        case .exhausted:
+            loud
+                ? "\(name(window)) is out of quota."
+                : "\(name(window)) is spent — it refills soon."
         }
     }
 
-    /// Short, lowercase chip label for a provider group's worst outlook.
-    static func badgeLabel(_ outlook: PaceOutlook?) -> String {
-        guard let outlook else { return "measuring" }
-        return switch outlook {
+    /// Short, lowercase chip label for a provider group. Like the summary,
+    /// it softens when the alarm does.
+    static func badgeLabel(_ verdict: PaceVerdict?) -> String {
+        guard let verdict else { return "measuring" }
+        let loud = verdict.alarm == .alert
+        return switch verdict.outlook {
         case .comfortable: "on track"
         case .idle: "idle"
         case .tight: "tight"
-        case .shortfall: "runs dry early"
-        case .exhausted: "spent"
+        case .shortfall: loud ? "runs dry early" : "running ahead"
+        case .exhausted: loud ? "spent" : "refills soon"
         case .unknown: "measuring"
         }
     }

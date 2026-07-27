@@ -12,7 +12,7 @@ struct ProviderGroupView: View {
     let verdicts: [String: PaceVerdict]
     let now: Date
 
-    private var worstMood: RobotMood { RobotMood(outlook: group.worstOutlook) }
+    private var worstMood: RobotMood { group.worstMood }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -22,7 +22,7 @@ struct ProviderGroupView: View {
                     .tracking(1.2)
                     .foregroundStyle(Theme.Colors.textTertiary)
                 Spacer()
-                StatusBadge(text: PaceFormatting.badgeLabel(group.worstOutlook),
+                StatusBadge(text: PaceFormatting.badgeLabel(group.worstVerdict),
                             mood: worstMood)
             }
             .padding(.top, 11)
@@ -44,7 +44,7 @@ struct WindowRowView: View {
     let verdict: PaceVerdict?
     let now: Date
 
-    private var mood: RobotMood { RobotMood(outlook: verdict?.outlook) }
+    private var mood: RobotMood { RobotMood(verdict: verdict) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -62,34 +62,31 @@ struct WindowRowView: View {
                 value: window.usedFraction,
                 mood: mood,
                 glow: mood != .calm,
-                pace: window.elapsedFraction(now: now)
+                pace: window.elapsedFraction(now: now),
+                projection: PaceProjection.of(verdict, window: window, now: now)
             )
 
-            verdictLine
+            footnote
         }
+        // The prose the marker replaced. Precision stays one hover away
+        // rather than shouting from the pane.
+        .help(verdict.map(PaceFormatting.verdictText) ?? "Measuring pace…")
     }
 
-    private var verdictColor: Color {
-        mood == .dim ? Theme.Colors.textSecondary : Theme.status(mood)
-    }
-
-    @ViewBuilder
-    private var verdictLine: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(verdict.map(PaceFormatting.verdictText) ?? "Measuring pace…")
-                    .font(RobutFont.ui(11, .medium))
-                    .foregroundStyle(verdictColor)
-                Spacer()
-                Text(PaceFormatting.resetText(for: window, now: now))
+    /// Deliberately colourless. The meter's marker carries the verdict now;
+    /// a second, louder copy of it in tinted prose is what made the pane
+    /// feel like an alarm panel.
+    private var footnote: some View {
+        HStack(alignment: .firstTextBaseline) {
+            if let qualifier = PaceFormatting.qualifier(verdict) {
+                Text(qualifier)
                     .font(RobutFont.ui(10))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-            }
-            if let detail = verdict.flatMap(PaceFormatting.detailText) {
-                Text(detail)
-                    .font(RobutFont.mono(10))
                     .foregroundStyle(Theme.Colors.textTertiary)
             }
+            Spacer(minLength: 4)
+            Text(PaceFormatting.resetText(for: window, now: now))
+                .font(RobutFont.ui(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
         }
     }
 }

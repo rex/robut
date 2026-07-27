@@ -39,28 +39,59 @@ struct PaceFormattingTests {
         #expect(PaceFormatting.percent(0.004) == "<1%")
     }
 
+    /// A verdict carrying just the two fields the wording reads.
+    private func said(_ outlook: PaceOutlook, _ alarm: PaceAlarm = .none) -> PaceVerdict {
+        var verdict = PaceVerdict(
+            outlook: outlook, burnPerHour: nil, safePerHour: 0, paceRatio: nil,
+            projectedExhaustion: nil, shortfall: nil, headroomAtReset: nil
+        )
+        verdict.alarm = alarm
+        return verdict
+    }
+
     @Test("The summary names the binding window when something is tight")
     func summaryNamesWorst() {
         let window = makeWindow(used: 0.7, resetsInHours: 40, provider: .codex, kind: .weekly)
-        let text = PaceFormatting.summaryText(outlook: .tight, window: window)
+        let text = PaceFormatting.summaryText(verdict: said(.tight, .notice), window: window)
         #expect(text == "Codex weekly is getting tight.")
     }
 
     @Test("The summary is calm and global when everything is fine")
     func summaryOnTrack() {
-        let text = PaceFormatting.summaryText(outlook: .comfortable, window: nil)
+        let text = PaceFormatting.summaryText(verdict: said(.comfortable), window: nil)
         #expect(text == "You're on track everywhere.")
     }
 
     @Test("No data yet reads as waiting, not an error")
     func summaryEmpty() {
-        #expect(PaceFormatting.summaryText(outlook: nil, window: nil) == "Waiting on usage data.")
+        #expect(PaceFormatting.summaryText(verdict: nil, window: nil) == "Waiting on usage data.")
+    }
+
+    @Test("The headline agrees with the colour, not just the outlook")
+    func summarySoftensWithTheAlarm() {
+        // The same fact, twice. Only the loud one is allowed to sound loud —
+        // an alarming sentence over a gold robot is what made this exhausting.
+        let window = makeWindow(used: 0.7, resetsInHours: 40, provider: .claude, kind: .weekly)
+        #expect(
+            PaceFormatting.summaryText(verdict: said(.shortfall, .alert), window: window)
+                == "On pace to run dry before reset."
+        )
+        #expect(
+            PaceFormatting.summaryText(verdict: said(.shortfall, .notice), window: window)
+                == "Claude weekly is running ahead of pace."
+        )
+        #expect(
+            PaceFormatting.summaryText(verdict: said(.exhausted, .notice), window: window)
+                == "Claude weekly is spent — it refills soon."
+        )
     }
 
     @Test("Badge labels are short and lowercase")
     func badges() {
-        #expect(PaceFormatting.badgeLabel(.shortfall) == "runs dry early")
-        #expect(PaceFormatting.badgeLabel(.comfortable) == "on track")
+        #expect(PaceFormatting.badgeLabel(said(.shortfall, .alert)) == "runs dry early")
+        #expect(PaceFormatting.badgeLabel(said(.shortfall, .notice)) == "running ahead")
+        #expect(PaceFormatting.badgeLabel(said(.exhausted, .notice)) == "refills soon")
+        #expect(PaceFormatting.badgeLabel(said(.comfortable)) == "on track")
         #expect(PaceFormatting.badgeLabel(nil) == "measuring")
     }
 }

@@ -191,6 +191,26 @@ change gets a corresponding test update.
   week is precisely the bug that once showed "runs dry ~1d 20h early" at
   7% used. Also: history retention (35d) exists to feed the prior-epoch
   learning — don't shorten it back.
+- **Outlook is FACT; alarm is CONSEQUENCE. Never re-merge them.**
+  `PaceOutlook` says what happens (a spent session really is
+  `.exhausted`); `PaceAlarm` (`PaceEngine+Alarm.swift`) says whether it
+  costs you anything, and **colour follows the alarm** via
+  `RobotMood(verdict:)`. Alert requires being dry ≥6h AND ≥25% of the time
+  left, which makes a session structurally unable to go red (5h window,
+  6h floor — deliberate) and makes the tolerance decay as the reset nears.
+  Collapsing the two is not a simplification, it's the regression: measured
+  on real history, folding outlook straight into colour read **red 52% of
+  the time with gold never appearing once**; the split reads 48/45/7.
+  Re-tune only against replayed history (`PaceEngine.alarmingDryShare`),
+  never to make one screenshot look nicer. Wording in `PaceFormatting`
+  softens with the alarm too — a loud sentence over a gold robot is a bug.
+- **The pane says the verdict with a MARKER, not a sentence.** Per-row
+  status text was removed on purpose (it read as an alarm panel).
+  `PaceProjection` puts it on the meter: surplus marks projected final
+  usage, shortfall marks *when* you hit zero in the window's timeline —
+  different axes, same reading, because in both the gap to the right edge
+  is your margin. Don't re-add tinted per-row prose; the tooltip carries
+  the precise sentence.
 - **Status colours have ONE source of truth: `RobotMood.nsTint`**
   (`RobotFace.swift`). The design tokens mirror it and `Theme.status(_:)`
   surfaces it — so the menubar icon and the pane can't drift. NEVER retune a

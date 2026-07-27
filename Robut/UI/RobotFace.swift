@@ -15,12 +15,30 @@ enum RobotMood: Sendable, Hashable {
     case alarmed    // shortfall — you'll run dry early
     case dim        // unknown / nothing configured
 
-    init(outlook: PaceOutlook?) {
-        switch outlook {
-        case .comfortable, .idle: self = .calm
-        case .tight: self = .squint
-        case .shortfall, .exhausted: self = .alarmed
-        case .unknown, nil: self = .dim
+    /// Colour follows the verdict's ALARM, not its outlook. The outlook is
+    /// factual ("you will run dry"); the alarm asks whether that costs you
+    /// anything. A spent session and a blown week are both `.shortfall`-ish
+    /// facts, and only one of them is worth turning the menubar red — see
+    /// `PaceAlarm` and `PaceEngine.alarmLevel`.
+    init(verdict: PaceVerdict?) {
+        guard let verdict else { self = .dim; return }
+        switch verdict.outlook {
+        case .unknown:
+            self = .dim
+        case .comfortable, .idle:
+            self = .calm
+        case .tight, .shortfall, .exhausted:
+            self = verdict.alarm == .alert ? .alarmed : .squint
+        }
+    }
+
+    /// Loudest-wins ordering, for folding many windows into one icon.
+    var rank: Int {
+        switch self {
+        case .dim: 0
+        case .calm: 1
+        case .squint: 2
+        case .alarmed: 3
         }
     }
 

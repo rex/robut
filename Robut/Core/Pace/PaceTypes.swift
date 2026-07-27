@@ -58,6 +58,22 @@ enum PaceOutlook: Sendable, Hashable {
     }
 }
 
+/// How loudly the UI should say it — deliberately SEPARATE from `outlook`,
+/// which stays factual.
+///
+/// A spent 5-hour session genuinely is `.exhausted`, but it refills within
+/// hours: nothing is on fire and there is nothing to do about it. Painting
+/// that the same red as a blown weekly is what made Robut exhausting to
+/// look at. Severity is a question about consequence, not about state.
+enum PaceAlarm: Sendable, Hashable {
+    /// Nothing to say. Green, or grey when we simply don't know.
+    case none
+    /// Worth a glance, not a reaction. Gold.
+    case notice
+    /// You will actually be blocked, for long enough to matter. Red.
+    case alert
+}
+
 struct PaceVerdict: Sendable, Hashable {
     let outlook: PaceOutlook
     /// nil when there isn't enough history.
@@ -72,4 +88,7 @@ struct PaceVerdict: Sendable, Hashable {
     let shortfall: TimeInterval?
     /// Fraction you'd still have at reset if you keep this pace.
     let headroomAtReset: Double?
+    /// Set by `PaceEngine.verdict(window:samples:now:lookback:)`; the raw
+    /// projection helpers leave it `.none`.
+    var alarm: PaceAlarm = .none
 }

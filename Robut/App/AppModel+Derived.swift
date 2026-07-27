@@ -8,7 +8,10 @@ import Foundation
 /// the unit the pane renders as one titled, badged group.
 struct ProviderUsageGroup: Identifiable {
     let provider: Provider
-    let worstOutlook: PaceOutlook?
+    /// The verdict driving this group's badge — from the LOUDEST window,
+    /// alarm-tempered, so a spent session doesn't paint the group red.
+    let worstVerdict: PaceVerdict?
+    let worstMood: RobotMood
     let windows: [UsageWindow]
 
     var id: String { provider.rawValue }
@@ -44,12 +47,14 @@ extension AppModel {
         }
     }
 
-    var worstOutlook: PaceOutlook? {
-        allWindows.compactMap { verdicts[$0.id]?.outlook }
-            .max { $0.severity < $1.severity }
+    /// The menubar icon's colour: the LOUDEST window, not the worst one.
+    /// Those differ, and the difference is the whole point — see
+    /// `PaceAlarm`. Folding on raw outlook is what kept the icon red.
+    var mood: RobotMood {
+        allWindows
+            .map { RobotMood(verdict: verdicts[$0.id]) }
+            .max { $0.rank < $1.rank } ?? .dim
     }
-
-    var mood: RobotMood { RobotMood(outlook: worstOutlook) }
 
     /// `allWindows` folded into per-provider groups, preserving order (so the
     /// worst-pace provider stays first, session before weekly within each).
@@ -62,22 +67,42 @@ extension AppModel {
         }
         return order.map { provider in
             let windows = byProvider[provider] ?? []
-            let worst = windows
-                .compactMap { verdicts[$0.id]?.outlook }
-                .max { $0.severity < $1.severity }
-            return ProviderUsageGroup(provider: provider, worstOutlook: worst, windows: windows)
+            let driver = loudestWindow(among: windows)
+            return ProviderUsageGroup(
+                provider: provider,
+                worstVerdict: driver.flatMap { verdicts[$0.id] },
+                worstMood: windows
+                    .map { RobotMood(verdict: verdicts[$0.id]) }
+                    .max { $0.rank < $1.rank } ?? .dim,
+                windows: windows
+            )
         }
     }
 
-    /// The window driving the worst outlook — named in the summary line.
-    var worstWindow: UsageWindow? {
-        allWindows.max {
-            (verdicts[$0.id]?.outlook.severity ?? 0) < (verdicts[$1.id]?.outlook.severity ?? 0)
+    /// The window the icon's colour is coming from — named in the summary.
+    /// Loudest first, then worst outlook, so the headline always explains
+    /// the colour the user is actually looking at.
+    func loudestWindow(among windows: [UsageWindow]) -> UsageWindow? {
+        windows.max { lhs, rhs in
+            let left = (
+                RobotMood(verdict: verdicts[lhs.id]).rank,
+                verdicts[lhs.id]?.outlook.severity ?? 0
+            )
+            let right = (
+                RobotMood(verdict: verdicts[rhs.id]).rank,
+                verdicts[rhs.id]?.outlook.severity ?? 0
+            )
+            return left < right
         }
     }
+
+    var worstWindow: UsageWindow? { loudestWindow(among: allWindows) }
 
     /// The answer-first headline for the whole pane.
     var summaryText: String {
-        PaceFormatting.summaryText(outlook: worstOutlook, window: worstWindow)
+        let window = worstWindow
+        return PaceFormatting.summaryText(
+            verdict: window.flatMap { verdicts[$0.id] }, window: window
+        )
     }
 }

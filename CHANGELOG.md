@@ -30,6 +30,49 @@ version bumps).
 
 ---
 
+## [0.19.0] — 2026-07-26 — Agent: Claude Opus 4.8
+### Added
+- **`PaceAlarm` — severity, separated from fact.** `PaceVerdict` now
+  carries how *loudly* to say a verdict alongside what the verdict is.
+  A window is `.alert` only when running dry would block you for at least
+  6 hours AND for at least a quarter of the time left before the reset;
+  otherwise `.notice`. Two consequences fall straight out of that rule:
+  a **session can never raise a full alert** (a 5-hour window always
+  refills within 5 hours, so the alarm was never actionable), and the
+  tolerance for a projection **decays as the reset approaches** — an
+  extrapolation six days out is mostly noise, six hours out it is not.
+- **`PaceProjection`** — where a verdict lands on the meter, as a 0…1
+  position. Surplus marks the projected final usage (the gap to the right
+  edge is quota you'll leave unused); shortfall marks *when* you hit zero
+  in the window's timeline (the gap is how long you'd be dry).
+
+### Changed
+- **The menubar is no longer mostly red.** Replayed against real history,
+  folding the raw outlook into colour read **red 52% of the time, with
+  gold never appearing at all**. Half of that was a weekly projected to
+  run dry ~20h early on a week that had actually ended at 96% — a
+  prediction contradicted by the user's own history, reported as an
+  emergency. The same history now reads **48% calm / 45% notice / 7%
+  alert**, while a synthetic runaway, an end-of-week emergency, and a
+  spent weekly all still alarm.
+- **The pane rows lost both text lines.** The grey `N%/hr pace ·
+  N%/hr sustainable` detail is gone, and so is the status-tinted verdict
+  sentence; the meter's marker carries the verdict now. What remains under
+  a bar is the grey reset line (plus a grey qualifier for the two states a
+  marker can't draw: still measuring, and spent). The full sentence
+  survives as the row's tooltip.
+- Header summary and group badge wording now soften with the alarm —
+  "Claude weekly is running ahead of pace" / "running ahead" at notice,
+  the blunt "On pace to run dry before reset" / "runs dry early" reserved
+  for a real alert. Alarming prose over a gold robot is a contradiction.
+- The menubar icon, group badges, and the pane summary all fold on the
+  **loudest** window rather than the worst outlook, so the headline always
+  explains the colour actually on screen.
+
+### Removed
+- `PaceFormatting.detailText` and `AppModel.worstOutlook` — both dead once
+  the row text and the mood fold changed.
+
 ## [0.18.1] — 2026-07-23 — Agent: Claude Opus 4.8
 ### Changed
 - Refreshed `TASK_STATE.md` and `PROGRESS.md` for context compaction: §0

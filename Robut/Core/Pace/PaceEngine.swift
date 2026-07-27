@@ -112,12 +112,27 @@ enum PaceEngine {
 
     // MARK: - Verdict
 
-    /// The whole product, in one function.
+    /// The whole product, in one function: project, then decide how loudly
+    /// to say it. The two are separate on purpose — see `PaceAlarm`.
     static func verdict(
         window: UsageWindow,
         samples: [UsageSample],
         now: Date,
         lookback: TimeInterval = defaultLookback
+    ) -> PaceVerdict {
+        var result = projection(
+            window: window, samples: samples, now: now, lookback: lookback
+        )
+        result.alarm = alarmLevel(for: result, window: window, now: now)
+        return result
+    }
+
+    /// The projection alone — what will happen, with no view on volume.
+    private static func projection(
+        window: UsageWindow,
+        samples: [UsageSample],
+        now: Date,
+        lookback: TimeInterval
     ) -> PaceVerdict {
         let remaining = window.remainingFraction
         let secondsToReset = window.resetsAt.timeIntervalSince(now)

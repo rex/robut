@@ -18,6 +18,9 @@ struct SegmentMeter: View {
     var glow: Bool = false
     /// 0...1 position of the even-pace tick; nil hides it.
     var pace: Double?
+    /// Where this window is projected to land. Drawn as a flag over the
+    /// bar — the gap between it and the right edge is the margin.
+    var projection: PaceProjection?
 
     var body: some View {
         HStack(spacing: gap) {
@@ -28,6 +31,7 @@ struct SegmentMeter: View {
         .frame(height: height)
         .animation(Theme.Motion.bar, value: filled)
         .overlay { marker }
+        .overlay { projectionFlag }
         .accessibilityElement()
         .accessibilityLabel("Usage")
         .accessibilityValue(percentLabel)
@@ -56,6 +60,31 @@ struct SegmentMeter: View {
                     .frame(width: 2, height: height + 2)
                     .position(x: markerX(pace, width: geo.size.width), y: height / 2)
             }
+        }
+    }
+
+    /// The projected outcome. Drawn as a colour bar on a panel-coloured
+    /// backing so it stays legible over both the fill and the empty track,
+    /// and standing proud of the meter so it never reads as a segment.
+    @ViewBuilder
+    private var projectionFlag: some View {
+        if let projection {
+            GeometryReader { geo in
+                ZStack {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Theme.Colors.panel)
+                        .frame(width: 6, height: height + 6)
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Theme.status(mood))
+                        .frame(width: 2, height: height + 6)
+                        .shadow(color: Theme.status(mood).opacity(0.6), radius: 2.5)
+                }
+                .position(
+                    x: markerX(projection.position, width: geo.size.width),
+                    y: height / 2
+                )
+            }
+            .animation(Theme.Motion.bar, value: projection.position)
         }
     }
 
