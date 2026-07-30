@@ -6,17 +6,19 @@
 - **Project**: Robut — macOS menubar AI-usage tracker (Swift 6 / SwiftUI /
   xcodegen). Shows Claude + Codex usage with burn-rate projection.
 - **Active branch**: `main`
-- **Version**: v0.18.0 — statistics capture layer; all gates green (84 tests).
+- **Version**: v0.21.0 — API-first Claude usage live; 139 tests green.
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
-- **Last session**: 2026-07-23 (Claude Opus 4.8). Ended by `/compact`.
-  Shipped design-system integration, pace forgiveness, stats capture.
+- **Last session**: 2026-07-30 (Claude Fable 5). Shipped the alarm split
+  (v0.19), diagnosed the CLI sampler collapse, resurrected OAuth with the
+  refresh race fixed (v0.20, ADR-0001), fixed the `limits` wire shape
+  (v0.21). API path verified live; weekly reset captured end-to-end.
 
 ## Current state (one line)
 
-Working end to end: Codex (from `~/.codex/sessions`) + Claude (via
-`claude -p "/usage"`). **Robut holds NO credentials.** The pane is now rebuilt
-to the Robut Design System — `Theme` tokens, self-hosted Geist, provider
-groups, SegmentMeters, an answer-first summary, and the per-bar pace marker.
+Working end to end: Codex (from `~/.codex/sessions`) + Claude **API-first**
+(`/api/oauth/usage`, Robut's OWN token, single-flight refresh; CLI
+fallback + hourly insights). Pane on the Robut Design System with
+alarm-gated colour and the projection marker.
 
 ## Last decisions
 
@@ -33,8 +35,14 @@ groups, SegmentMeters, an answer-first summary, and the per-bar pace marker.
 - 2026-07-23 Integrated the Robut Design System (claude.ai design project):
   a Swift `Theme` (status colours sourced from `RobotMood.nsTint`), self-hosted
   Geist/Geist Mono, and a full pane rebuild + the pace marker. v0.16.0.
+- 2026-07-30 **API-first Claude (ADR-0001)**: the CLI sampler collapsed
+  under load (1–3 samples/day; blackout before a reset), so the OAuth
+  layer returned with its killer fixed — `ClaudeTokenManager`, a
+  single-flight actor (the v0.14 "kept breaking on refresh" was a
+  concurrent-refresh race on a rotating token). Robut's token lives in
+  Robut's OWN keychain item; another app's item is still never read.
 - 2026-07-23 Claude = the `claude` CLI, sole source; OAuth/token/keychain
-  layer was built then DELETED (~1,650 lines). Robut holds zero credentials.
+  layer deleted (~1,650 lines) — superseded 07-30 by ADR-0001 above.
 
 ## Open blockers
 
@@ -51,7 +59,8 @@ groups, SegmentMeters, an answer-first summary, and the per-bar pace marker.
 
 ## Do NOT
 
-- Reintroduce any keychain/OAuth/token dependency — it was deliberately removed.
+- Read another app's keychain item, ever. Robut's own token is touched
+  ONLY by `ClaudeTokenManager` — never add a second keychain surface.
 - Change `Core/Pace/**` logic without a test — it's the product.
 - Retune the four status colours anywhere but `RobotMood.nsTint` — `Theme`
   sources them from there on purpose.

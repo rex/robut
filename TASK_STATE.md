@@ -21,18 +21,24 @@ estimates, all local + read-only, read via `model.stats.snapshot()`.
 
 **Architecture is settled:**
 - Codex usage: read from `~/.codex/sessions/**/*.jsonl` (on disk).
-- Claude usage: `ClaudeCLIUsageSource` runs `claude -p "/usage"` and parses
-  the text (`ClaudeUsageTextParser`). **Robut holds NO credentials** — the
-  OAuth/token/keychain layer was built then DELETED (v0.15.0). Do not
-  reintroduce it. See `AGENTS.md` §1/§9 and `mem:robut-claude-usage-auth`.
+- Claude usage (ADR-0001, v0.20–0.21): **API-first** —
+  `ClaudeAPIUsageSource` reads `/api/oauth/usage` with Robut's OWN
+  full-scope PKCE token (its own keychain item; float resolution; the
+  `limits` array carries model-scoped windows like Fable). Token
+  lifecycle ONLY in `ClaudeTokenManager` (single-flight actor — the
+  v0.14 refresh race is the whole reason it exists). `ClaudeCLIUsageSource`
+  is the fallback + hourly insights carrier. **Never read another app's
+  keychain item.** See `AGENTS.md` §1/§9, `mem:robut-claude-usage-auth`.
 - The pace math lives in `Core/Pace/PaceEngine.swift` (pure, clock-injected,
-  heavily tested — this is the product; treat it as load-bearing).
+  heavily tested — this is the product; treat it as load-bearing). Verdict
+  severity is alarm-gated (`PaceEngine+Alarm`, v0.19) — outlook is fact,
+  alarm is consequence; colour follows the alarm.
 
-**Current context:** Claude Design is designing the STATS DISPLAY right
-now (handoff: `docs/stats-matrix.md`, pushed into the design project as
-`stats-matrix.md`; a standalone data-exploration window is on the table).
-The data side is done and flowing. Everything green (84 tests / 20
-suites, lint, privacy, architecture).
+**Current context:** the API path went live 2026-07-30 (~03:00), the
+same minute a weekly reset was captured end-to-end — the first quality
+prior-epoch peak and a quota-estimator calibration point. Claude Design
+is still designing the STATS DISPLAY (`docs/stats-matrix.md`). Everything
+green (139 tests / 31 suites, lint, privacy, architecture).
 
 **Next planned work:** build the stats display once Claude Design's
 design lands (sync it via the DesignSync tool, same flow as the pane
@@ -51,9 +57,12 @@ keychain-prompt bug returns).
 - **Autonomy: continue-until-blocked.** Stop only on a hard blocker or a
   decision that's the maintainer's.
 - **Tests are a required gate**, focused on the pace/projection engine.
-- **Robut holds NO credentials.** Never read any keychain item (not its own,
-  not another app's). Codex = disk; Claude = the `claude` CLI, which
-  authenticates itself. This is the settled expression of the founding rule.
+- **Never read another app's keychain item — the founding rule.** Robut
+  MAY hold credentials it minted itself, in items it created itself
+  (ADR-0001 amended the earlier zero-credential stance; the maintainer
+  approved 2026-07-30). All token custody stays in `ClaudeTokenManager`;
+  never a second keychain surface; never auto-retry a rejected credential.
+- **Claude is the priority; Codex is secondary** (used far less).
 - **Don't polish the UI right now** — Claude Design owns it. Keep the data
   model clean and correct instead.
 - **Diagnose provider formats from real data, not guesses** — capture actual
@@ -132,6 +141,32 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 4. Recent decisions (append-only, newest first)
 
+- 2026-07-30 — **API-first Claude usage; the zero-credential rule amended
+  (ADR-0001, v0.20.0–0.21.0).** Forcing function measured on real data:
+  under machine load the CLI path delivered 1–3 samples/DAY (07-28/29)
+  and blacked out 11 min before a weekly reset; its text also rounds to
+  integer percent (~81M tok/step). Post-mortem of the deleted v0.14 layer
+  named the real defect — overlapping fetches racing ONE rotating refresh
+  token; `invalid_grant` correctly terminal → endless re-sign-in. Fix:
+  `ClaudeTokenManager` (actor, single-flight, persist-before-use,
+  `.userAction` latch). `ClaudeCompositeSource` arbitrates: API primary,
+  CLI only when the token path structurally can't serve, CLI hourly for
+  the insights text. Wire: `/api/oauth/usage` now carries model-scoped
+  windows ONLY in a `limits` array (kind `weekly_scoped`, `percent`,
+  `scope.model.display_name`) — decoded with id continuity
+  (`claude.weekly.Fable`); shape proven offline from the binary
+  (`fetchUtilization`, `NPt`, `formatRateLimits` — floats floored for
+  display). Founding rule intact: never another app's keychain item.
+- 2026-07-30 — **First fully-witnessed weekly close.** Reset captured at
+  03:00:28 (92→94% final climb, then 0%); Fable 76%→1%. This epoch seeds
+  `priorEpochPeaks` (the quality gate had excluded last week's thin
+  4-sample record) and calibrates the quota estimator. Left on the table
+  ~6-8%.
+- 2026-07-26 — **Alarm ≠ outlook (v0.19.0).** `PaceAlarm` separates "what
+  happens" from "how loudly": alert requires dry ≥6h AND ≥25% of time
+  left. Replayed on real history: 52% red / 0% gold became 48/45/7.
+  Colour follows the alarm (`RobotMood(verdict:)`); per-row prose became
+  the meter's `PaceProjection` marker + tooltip.
 - 2026-07-23 — **Statistics capture layer (v0.18.0).** `Core/Stats/`
   captures everything locally available: daily token rollups (day × provider
   × model × project, incremental cursor scans of both transcript stores),

@@ -30,6 +30,14 @@ version bumps).
 
 ---
 
+## [0.21.1] — 2026-07-30 — Agent: Claude Fable 5
+### Changed
+- Orientation docs caught up with ADR-0001: `TASK_STATE.md` §0/§4 and
+  `PROGRESS.md` now describe the API-first Claude architecture, the
+  amended credential rule, the alarm split (v0.19), and the captured
+  weekly close — the session-start hook no longer instructs agents to
+  preserve an architecture that was superseded.
+
 ## [0.21.0] — 2026-07-30 — Agent: Claude Fable 5
 ### Fixed
 - **The Fable weekly vanished the moment the API path went live.** The
