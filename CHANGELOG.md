@@ -30,6 +30,20 @@ version bumps).
 
 ---
 
+## [0.21.0] — 2026-07-30 — Agent: Claude Fable 5
+### Fixed
+- **The Fable weekly vanished the moment the API path went live.** The
+  `/api/oauth/usage` response evolved since v0.14: model-scoped windows
+  now arrive ONLY via a `limits` array (`kind: "weekly_scoped"`,
+  `percent`, `resets_at`, `scope.model.display_name`) — the legacy
+  `seven_day_overage_included` key is gone. Extracted the CLI's own
+  consumers (`NPt`, `formatRateLimits`) from the binary to confirm the
+  shape offline; the decoder now reads both forms, unknown kinds are
+  ignored, and a scoped entry duplicating a legacy key is dropped so a
+  window's history bucket can't be double-fed. `Math.floor(a.utilization)`
+  in the CLI's renderer also confirms the API serves floats that the
+  text truncates — the resolution the pace engine now receives.
+
 ## [0.20.0] — 2026-07-30 — Agent: Claude Fable 5
 ### Added
 - **API-first Claude usage with Robut's OWN token (ADR-0001).**

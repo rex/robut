@@ -9,7 +9,12 @@
 //   seven_day                  → "weekly limit"     (all models)
 //   seven_day_opus             → "Opus limit"
 //   seven_day_sonnet           → "Sonnet limit"
-//   seven_day_overage_included → "Fable 5 limit"    (what CodexBar calls "Fable")
+//   seven_day_overage_included → legacy Fable key (kept for back-compat)
+//   limits                     → ARRAY of model-scoped windows — the shape
+//     that replaced the overage key. Each entry: kind ("weekly_scoped"),
+//     percent, resets_at, scope.model.display_name ("Fable"). This is how
+//     the Fable weekly arrives today; the CLI's own panel renders it via
+//     exactly this filter (`kind === "weekly_scoped"` + display_name).
 // A plan may expose any subset; every one that's present is surfaced.
 
 import Foundation
@@ -20,6 +25,7 @@ struct UsagePayload: Decodable {
     let sevenDayOpus: Limit?
     let sevenDaySonnet: Limit?
     let sevenDayOverage: Limit?
+    let limits: [ScopedLimit]?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -27,17 +33,71 @@ struct UsagePayload: Decodable {
         case sevenDayOpus = "seven_day_opus"
         case sevenDaySonnet = "seven_day_sonnet"
         case sevenDayOverage = "seven_day_overage_included"
+        case limits
     }
 
     func windows(provider: Provider, now: Date) -> [UsageWindow] {
         let week = 10_080
-        return [
+        var built: [UsageWindow] = [
             fiveHour?.window(provider: provider, minutes: 300, variant: nil, now: now),
             sevenDay?.window(provider: provider, minutes: week, variant: nil, now: now),
             sevenDayOpus?.window(provider: provider, minutes: week, variant: "Opus", now: now),
             sevenDaySonnet?.window(provider: provider, minutes: week, variant: "Sonnet", now: now),
             sevenDayOverage?.window(provider: provider, minutes: week, variant: "Fable", now: now),
         ].compactMap { $0 }
+
+        // Model-scoped entries. Skip any whose id a legacy key already
+        // produced — if the API ever sends both forms for one window,
+        // duplicate ids would corrupt the per-window history buckets.
+        var seen = Set(built.map(\.id))
+        for scoped in limits ?? [] {
+            guard let window = scoped.window(provider: provider, now: now),
+                  !seen.contains(window.id)
+            else { continue }
+            seen.insert(window.id)
+            built.append(window)
+        }
+        return built
+    }
+
+    /// One entry of the `limits` array. Unknown kinds decode fine and are
+    /// simply not rendered — the shape is not a contract.
+    struct ScopedLimit: Decodable {
+        let kind: String?
+        /// Percent-scale, like `utilization` (the CLI maps it 1:1).
+        let percent: Double?
+        let resetsAt: FlexibleDate?
+        let scope: Scope?
+
+        enum CodingKeys: String, CodingKey {
+            case kind, percent, scope
+            case resetsAt = "resets_at"
+        }
+
+        struct Scope: Decodable {
+            let model: Model?
+
+            struct Model: Decodable {
+                let displayName: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case displayName = "display_name"
+                }
+            }
+        }
+
+        func window(provider: Provider, now: Date) -> UsageWindow? {
+            guard kind == "weekly_scoped", let percent else { return nil }
+            let length = TimeInterval(7 * 24 * 3600)
+            return UsageWindow(
+                provider: provider,
+                kind: .weekly,
+                variant: scope?.model?.displayName,
+                usedFraction: min(1, max(0, percent / 100)),
+                resetsAt: resetsAt?.date ?? now.addingTimeInterval(length),
+                length: length
+            )
+        }
     }
 
     struct Limit: Decodable {
