@@ -30,6 +30,47 @@ version bumps).
 
 ---
 
+## [0.20.0] — 2026-07-30 — Agent: Claude Fable 5
+### Added
+- **API-first Claude usage with Robut's OWN token (ADR-0001).**
+  `ClaudeAPIUsageSource` reads `/api/oauth/usage` directly: float
+  utilization (the CLI text rounds to integer percent — ~81M tokens per
+  step on the observed weekly), epoch reset times, and every window the
+  plan exposes (`five_hour`, `seven_day`, `seven_day_opus`, `_sonnet`,
+  `_overage_included` → "Fable"; history ids stay continuous). One
+  bounded ~sub-second call replaces a 1–45s Node spawn that succeeds
+  ~2 of 3 times.
+- **`ClaudeTokenManager` — the single-flight fix for what killed v0.14.**
+  Post-mortem of the deleted layer (`26e078c^`) found the real defect:
+  overlapping fetches raced one one-shot rotating refresh token; the
+  loser's `invalid_grant` demanded a fresh sign-in ("kept breaking on
+  expiry/refresh"). The actor makes it impossible: one cached bundle,
+  one in-flight refresh shared by all callers, rotated bundle persisted
+  before use, `invalid_grant` latched to `.userAction` (never
+  timer-retried). Pinned by a concurrency regression suite.
+- **`ClaudeCompositeSource`** — API first; CLI fallback ONLY when the
+  token path structurally can't serve (never on rate limits); while the
+  API serves, the CLI rides along hourly purely to feed the `/usage`
+  analytics block to the stats ledger.
+- Restored from git history, proven constants intact: `ClaudeOAuth`
+  (PKCE against platform.claude.com, paste-code flow), `RobutKeychain`
+  (Robut's OWN item — the founding never-read-another-app's-item rule is
+  unchanged), `ClaudeUsageWire`, `URLSession.robut`, `ClaudeCLI.authStatus`,
+  and the inline `ClaudeSetupView` (adapted to the Theme).
+- `docs/adr/0001-robut-owns-its-claude-credential.md` — the founding-rule
+  amendment: Robut may hold credentials it minted itself, in items it
+  created itself; reading another app's item remains forbidden.
+- 34 new tests (137 total, 31 suites): token manager concurrency/rotation/
+  latching, API status mapping, scope gating, composite arbitration,
+  PKCE/wire suites resurrected.
+
+### Context
+- Forcing function, measured on real data: under machine load the CLI
+  path delivered 1–3 samples per DAY on 2026-07-28/29 (2-minute design
+  cadence) and blacked out for 11 minutes in the final hour before a
+  weekly reset. The 07-23 "CLI is the sole source" decision was made
+  before this evidence existed.
+
 ## [0.19.0] — 2026-07-26 — Agent: Claude Opus 4.8
 ### Added
 - **`PaceAlarm` — severity, separated from fact.** `PaceVerdict` now

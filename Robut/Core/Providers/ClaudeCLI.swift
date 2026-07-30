@@ -63,6 +63,46 @@ enum ClaudeCLI {
         return result
     }
 
+    // MARK: - Auth status
+
+    /// Used ONLY to tell three states apart: Claude Code isn't installed,
+    /// it's installed but signed out, or it's signed in and Robut just
+    /// needs its own token. That distinction lets an unconfigured machine
+    /// show a calm "not set up" row instead of a sign-in nag.
+    ///
+    /// PRIVACY: `claude auth status --json` includes the account email,
+    /// org id and org name. Robut reads `loggedIn` and `subscriptionType`
+    /// and discards the rest — none of it is ever logged, persisted, or
+    /// shown.
+    struct AuthStatus: Sendable {
+        let loggedIn: Bool
+        /// e.g. "max" / "pro". Display only; never used for logic, since
+        /// the strings aren't stable.
+        let subscriptionType: String?
+    }
+
+    /// nil when the CLI is absent or the call failed. Never throws at the
+    /// caller: an unavailable CLI is a state, not an error.
+    static func authStatus(timeout: TimeInterval = 10) async -> AuthStatus? {
+        guard let executable = executableURL() else { return nil }
+        guard let output = await run(executable, arguments: ["auth", "status", "--json"],
+                                     timeout: timeout) else { return nil }
+        guard let data = output.data(using: .utf8),
+              let raw = try? JSONDecoder().decode(RawAuthStatus.self, from: data)
+        else { return nil }
+
+        return AuthStatus(loggedIn: raw.loggedIn ?? false,
+                          subscriptionType: raw.subscriptionType)
+    }
+
+    /// Only the two fields Robut is allowed to care about. Everything
+    /// else in the payload is personal data and is deliberately not
+    /// modelled, so it cannot be accidentally logged later.
+    private struct RawAuthStatus: Decodable {
+        let loggedIn: Bool?
+        let subscriptionType: String?
+    }
+
     private static func scratchDirectory() -> URL {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "robut-claude-probe", directoryHint: .isDirectory)

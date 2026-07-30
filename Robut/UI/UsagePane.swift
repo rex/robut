@@ -12,6 +12,8 @@ struct UsagePane: View {
     @Bindable var model: AppModel
     /// Drives the countdown text without re-fetching anything.
     @State private var now = Date()
+    /// Inline Claude sign-in (never a sheet — it would dismiss the panel).
+    @State private var showClaudeSetup = false
 
     private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -23,6 +25,10 @@ struct UsagePane: View {
                 isRefreshing: model.isRefreshing
             )
             content
+            if showClaudeSetup {
+                hairline
+                ClaudeSetupView(model: model) { showClaudeSetup = false }
+            }
             hairline
             footer
         }
@@ -94,6 +100,14 @@ struct UsagePane: View {
             }
 
             Spacer()
+
+            // The upgrade path (ADR-0001): float-resolution usage via
+            // Robut's own token. Quiet once connected.
+            Button(model.claudeConnected ? "Claude ✓" : "Connect Claude") {
+                showClaudeSetup.toggle()
+            }
+            .buttonStyle(.link)
+            .font(RobutFont.ui(model.claudeConnected ? 10 : 11, .medium))
 
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)

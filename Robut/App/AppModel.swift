@@ -43,6 +43,13 @@ final class AppModel {
     /// The statistics ledger (token accounting, insights, quota estimates)
     /// — fed by the refresh loop, read by whatever displays it.
     let stats: UsageStatsStore
+    /// Robut's OWN Claude token lifecycle (ADR-0001). Single-flight; the
+    /// only component allowed to touch the keychain item.
+    let claudeAuth: ClaudeTokenManager
+    /// Sign-in state — see AppModel+ClaudeAuth (which also writes
+    /// `claudeConnected`, the sync UI mirror of `claudeAuth.hasToken`).
+    var pendingPKCE: ClaudePKCE?
+    var claudeConnected = false
     private var ticker: Task<Void, Never>?
     private var didSeedHistory = false
 
@@ -55,19 +62,24 @@ final class AppModel {
     init(
         sources: [any UsageSource]? = nil,
         history: UsageHistoryStore = UsageHistoryStore(),
-        stats: UsageStatsStore = UsageStatsStore()
+        stats: UsageStatsStore = UsageStatsStore(),
+        claudeAuth: ClaudeTokenManager = ClaudeTokenManager()
     ) {
-        // v1 tracks Codex (read from local session files) and Claude (via
-        // the `claude` CLI). Robut holds NO credentials of its own for
-        // either — Codex is on disk, and the CLI authenticates itself.
-        // The CLI source forwards its raw usage text to the stats ledger
-        // (the analytics block rides along with the limit lines).
+        // Codex reads local session files. Claude prefers the API with
+        // Robut's OWN token (float resolution, deterministic — ADR-0001)
+        // and falls back to the `claude` CLI, which also carries the
+        // analytics block to the stats ledger. Robut never reads another
+        // app's credential — its token lives in its own keychain item.
         self.stats = stats
+        self.claudeAuth = claudeAuth
         self.sources = sources ?? [
             CodexUsageSource(),
-            ClaudeCLIUsageSource(onUsageText: { text, at in
-                await stats.ingest(usageText: text, at: at)
-            }),
+            ClaudeCompositeSource(
+                token: ClaudeAPIUsageSource(manager: claudeAuth),
+                cli: ClaudeCLIUsageSource(onUsageText: { text, at in
+                    await stats.ingest(usageText: text, at: at)
+                })
+            ),
         ]
         self.history = history
         for source in self.sources { states[source.provider] = .loading }
@@ -78,6 +90,7 @@ final class AppModel {
     func start() {
         guard ticker == nil else { return }
         Log.app.notice("start(): beginning refresh loop")
+        Task { await refreshClaudeConnected() }
         // Strong `self` on purpose: this object lives for the lifetime of
         // the app (see `shared`), and a weak capture here previously let
         // the loop silently no-op.

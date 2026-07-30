@@ -25,14 +25,19 @@
 **The one thing to understand before touching auth:** Robut exists because
 CodexBar endlessly re-prompts for the keychain password. Cause: it reads
 *Claude Code's* keychain item, and Claude Code rewrites that item on every
-token refresh, resetting its ACL. Robut's answer: **hold no credentials at
-all.** Codex usage is read from `~/.codex/sessions` (on disk); Claude usage
-comes from spawning `claude -p "/usage"`, which authenticates *itself*
-against Claude Code's own credentials. Robut never touches any keychain
-item — not its own, not anyone's. Do not add a keychain dependency or read
-`Claude Code-credentials`; that reintroduces the entire bug. (An earlier
-OAuth/token approach was built and removed — it kept breaking on token
-expiry/refresh, and the CLI path is simpler and needs no credential.)
+token refresh, resetting its ACL. The founding rule: **Robut NEVER reads
+another app's keychain item** — above all `Claude Code-credentials`. An
+app is never prompted for an item it created itself, so Robut MAY hold
+credentials it minted into its OWN item (`RobutKeychain`, ADR-0001):
+Claude usage prefers `/api/oauth/usage` with Robut's own full-scope PKCE
+token (float resolution, deterministic), falling back to spawning
+`claude -p "/usage"` (which authenticates itself; also carries the
+insights text). Codex is read from `~/.codex/sessions` (on disk). Token
+lifecycle lives ONLY in `ClaudeTokenManager` — a single-flight actor.
+(A first token layer was built, deleted in v0.15.0 as "kept breaking on
+expiry/refresh", and resurrected in v0.20.0 once the post-mortem found
+the real defect: concurrent fetches racing one rotating refresh token.
+Don't re-litigate either move without reading ADR-0001.)
 
 ## 2. Setup
 
@@ -91,6 +96,13 @@ change gets a corresponding test update.
 
 - **Never read another app's keychain item** — above all not
   `Claude Code-credentials`. That IS the bug this app exists to fix.
+  Robut's own token lives in its OWN item via `RobutKeychain` — the only
+  keychain surface in the codebase — and is touched only by
+  `ClaudeTokenManager` (single-flight; ADR-0001). Never a second surface.
+- **Never auto-retry a rejected credential** (`invalid_grant`, 401/403 →
+  `.userAction`); token refresh hits platform.claude.com, never the
+  rate-limited usage endpoint; an inference-only token is rejected by
+  scope inspection without spending a call.
 - **No personal data, ever.** Public repo. Run `make privacy` before pushing;
   `make privacy-history` audits the full history. Fixtures synthetic only.
 - No secrets committed. `detect-secrets` + the privacy gate enforce.
@@ -132,6 +144,14 @@ change gets a corresponding test update.
   the browser PKCE flow (`ClaudeOAuth`). Don't reintroduce a setup-token
   path. Robut rejects an inference-only token from its scopes, without
   calling the endpoint.
+- **Token refresh is SINGLE-FLIGHT, in `ClaudeTokenManager` only.** The
+  v0.14 auth layer died of one race: overlapping fetches (which the
+  refresh loop's supersede guard provably produces) each spent the same
+  one-shot rotating refresh token; the loser's `invalid_grant` demanded a
+  fresh sign-in — "kept breaking on expiry/refresh" was that, not the
+  API. Never refresh from a source's `fetch`; never add a second caller
+  of `ClaudeOAuth.refresh`. The rotated bundle persists BEFORE first use.
+  `ClaudeTokenManagerTests` pins all of this — see ADR-0001.
 - **Diagnose provider APIs offline before spending calls.** The Claude
   Code binary is a native Mach-O with the JS embedded; `strings` reveals
   endpoints, headers, scopes, and gate logic. That's how the scope

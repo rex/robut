@@ -7,7 +7,7 @@ format. Use `template.md` as the starting point for new decisions.
 
 | # | Status | Title | Date |
 |---|---|---|---|
-| 0001 | accepted | <Title> | YYYY-MM-DD |
+| [0001](0001-robut-owns-its-claude-credential.md) | accepted | Robut holds its own Claude credential | 2026-07-30 |
 
 ## When to write an ADR
 
