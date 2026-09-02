@@ -30,6 +30,33 @@ version bumps).
 
 ---
 
+## [0.22.0] — 2026-09-02 — Agent: Claude Opus 5
+### Fixed
+- **A signed-out Claude CLI pinned the row on "Calculating…" forever.**
+  `ClaudeCLIUsageSource.fetch` checked `isInstalled` but never `loggedIn`.
+  In print mode `claude -p "/usage"` still exits 0 while signed out — it
+  returns the end-of-session cost summary (`num_turns: 0`) with no limit
+  lines, which is byte-for-byte indistinguishable from the documented
+  ~1-in-3 partial output. So every fetch burned all four attempts and
+  returned a TRANSIENT `.failed(retry: .after(5 * 60))`, which by design
+  keeps the last-good data on screen — and then re-ran the whole probe
+  every five minutes, indefinitely. A permanent auth problem wearing a
+  transient failure's clothes, i.e. exactly the auth-retry anti-pattern
+  `RetryPolicy` was introduced to prevent. `fetch` now resolves auth
+  first and returns `.notConfigured` when the CLI is signed out (or its
+  status is unreadable), so `ClaudeCompositeSource` falls through to the
+  token path's sign-in guidance instead of a silent five-minute loop.
+  The probe is no longer spawned at all in that state.
+- Found in the field: an 8-hour power outage stalled the CLI's OAuth
+  refresh, which wrote back empty `accessToken`/`refreshToken` and a zero
+  `expiresAt`. The Keychain item still existed and still read
+  `subscriptionType: max`, so nothing looked broken — the row simply
+  calculated for a day.
+
+### Changed
+- `ClaudeCLIUsageSource` takes an injectable `authStatus`, mirroring
+  `ClaudeAPIUsageSource`, so tests still never spawn a process.
+
 ## [0.21.1] — 2026-07-30 — Agent: Claude Fable 5
 ### Changed
 - Orientation docs caught up with ADR-0001: `TASK_STATE.md` §0/§4 and

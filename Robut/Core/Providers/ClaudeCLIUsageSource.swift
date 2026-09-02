@@ -38,6 +38,8 @@ struct ClaudeCLIUsageSource: UsageSource {
     /// Injectable so tests never spawn a process.
     let run: @Sendable (TimeInterval) async -> String?
     let timeout: TimeInterval
+    /// Injectable so tests never spawn a process.
+    let authStatus: @Sendable () async -> ClaudeCLI.AuthStatus?
     /// The raw usage text carries more than the limit lines (the CLI's
     /// analytics block); forwarded here on every successful fetch so the
     /// stats layer can capture it without a second CLI call.
@@ -46,12 +48,16 @@ struct ClaudeCLIUsageSource: UsageSource {
     init(
         timeout: TimeInterval = defaultTimeout,
         run: (@Sendable (TimeInterval) async -> String?)? = nil,
+        authStatus: @escaping @Sendable () async -> ClaudeCLI.AuthStatus? = {
+            await ClaudeCLI.authStatus()
+        },
         onUsageText: (@Sendable (String, Date) async -> Void)? = nil
     ) {
         self.timeout = timeout
         self.run = run ?? { seconds in
             await ClaudeCLI.usageOutput(timeout: seconds)
         }
+        self.authStatus = authStatus
         self.onUsageText = onUsageText
     }
 
@@ -62,6 +68,20 @@ struct ClaudeCLIUsageSource: UsageSource {
 
     func fetch(now: Date) async -> ProviderState {
         guard ClaudeCLI.isInstalled else { return .notConfigured }
+
+        // A signed-out CLI cannot produce a usage report: `/usage` still
+        // exits 0, but returns the cost-summary envelope with no limit
+        // lines. Without this check that is indistinguishable from the
+        // documented non-determinism above, so every fetch burned all
+        // four attempts and returned a TRANSIENT failure — which kept
+        // stale data on screen and re-ran the whole probe every 5 minutes,
+        // forever. That is the auth-retry anti-pattern this codebase
+        // already paid for once; a rejected credential cannot fix itself.
+        // Report it as unconfigured so the composite surfaces the token
+        // path's sign-in guidance instead.
+        guard let status = await authStatus(), status.loggedIn else {
+            return .notConfigured
+        }
 
         for attempt in 1...Self.maxAttempts {
             guard let output = await run(timeout) else { continue }

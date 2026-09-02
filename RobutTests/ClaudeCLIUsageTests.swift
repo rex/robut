@@ -140,7 +140,10 @@ struct ClaudeCLISourceTests {
         #expect(ClaudeCLI.resultText(fromJSONEnvelope: usageText) == nil)
 
         guard ClaudeCLI.isInstalled else { return }
-        let source = ClaudeCLIUsageSource { _ in self.usageText }
+        let source = ClaudeCLIUsageSource(
+            run: { _ in self.usageText },
+            authStatus: { ClaudeCLI.AuthStatus(loggedIn: true, subscriptionType: nil) }
+        )
         let snapshot = try #require(await source.fetch(now: t0).snapshot)
         #expect(snapshot.windows.count == 2)
     }
@@ -150,10 +153,47 @@ struct ClaudeCLISourceTests {
         // A run that never yields limit lines must be a TRANSIENT failure,
         // so the model keeps the last-good data rather than blanking rows.
         guard ClaudeCLI.isInstalled else { return }
-        let source = ClaudeCLIUsageSource { _ in "Welcome to Claude Code!" }
+        let source = ClaudeCLIUsageSource(
+            run: { _ in "Welcome to Claude Code!" },
+            authStatus: { ClaudeCLI.AuthStatus(loggedIn: true, subscriptionType: nil) }
+        )
         guard case .failed(_, let retry) = await source.fetch(now: t0) else {
             Issue.record("Expected .failed for output with no limit lines"); return
         }
         #expect(retry == .after(5 * 60))
+    }
+
+    @Test("A signed-out CLI is unconfigured, and never runs the probe")
+    func signedOutIsNotTransient() async {
+        // Regression (an 8-hour outage wiped the CLI's OAuth tokens): in
+        // print mode `/usage` still exits 0 when signed out, returning the
+        // cost summary with no limit lines — indistinguishable from the
+        // documented partial output. That made a PERMANENT auth problem
+        // look transient, so the row held stale data ("Calculating…")
+        // while re-probing every 5 minutes, forever. A signed-out CLI must
+        // report unconfigured, and must not spend a probe to discover it.
+        guard ClaudeCLI.isInstalled else { return }
+        let source = ClaudeCLIUsageSource(
+            run: { _ in
+                Issue.record("The usage probe must not run while signed out")
+                return nil
+            },
+            authStatus: { ClaudeCLI.AuthStatus(loggedIn: false, subscriptionType: nil) }
+        )
+        guard case .notConfigured = await source.fetch(now: t0) else {
+            Issue.record("Expected .notConfigured when the CLI is signed out"); return
+        }
+    }
+
+    @Test("An unreadable auth status is treated as signed out")
+    func authStatusUnavailable() async {
+        guard ClaudeCLI.isInstalled else { return }
+        let source = ClaudeCLIUsageSource(
+            run: { _ in self.usageText },
+            authStatus: { nil }
+        )
+        guard case .notConfigured = await source.fetch(now: t0) else {
+            Issue.record("Expected .notConfigured when auth status is unreadable"); return
+        }
     }
 }
