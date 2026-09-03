@@ -248,8 +248,7 @@ change gets a corresponding test update.
 1. Read `PROGRESS.md` (session orientation) then `TASK_STATE.md` §0 and current slice.
 2. Read `CONVENTIONS.md` before editing code.
 3. Use `MAP.md` for exploration; `agent_docs/` for deep-dive detail.
-4. Use Serena MCP symbolic tools over raw grep for cross-file work.
-5. Use Context7 MCP for up-to-date library docs; don't rely on training data.
+4. Use Context7 MCP for up-to-date library docs; don't rely on training data.
 
 ## 11. When ending a session
 

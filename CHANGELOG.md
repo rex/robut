@@ -30,6 +30,10 @@ version bumps).
 
 ---
 
+## [0.23.0] — 2026-09-03 — Agent: Claude
+### Removed
+- chore: Serena removed (retired 2026-09-03): .mcp.json entry, .serena/, rules/flags
+
 ## [0.22.0] — 2026-09-02 — Agent: Claude Opus 5
 ### Fixed
 - **A signed-out Claude CLI pinned the row on "Calculating…" forever.**
