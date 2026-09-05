@@ -27,6 +27,19 @@
 	<key>LSUIElement</key>
 	<true/>
 
+	<!-- Sparkle auto-update. The appcast is published as a GitHub Release
+	     asset; the /releases/latest/download/ URL always resolves to the
+	     newest release, so the feed needs no hosting of its own. Updates
+	     must carry a valid EdDSA signature from the key below AND the same
+	     Developer ID as the running app. The private key lives only in the
+	     maintainer's login keychain (`make sparkle-keys-init`). -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/rex/robut/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>bJ2SRh3KHrwfSUb63+79Jdr5+/6RuJG5kmy5LllW4Y4=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+
 	<!-- Robut talks only to provider APIs over HTTPS. No ATS exceptions. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

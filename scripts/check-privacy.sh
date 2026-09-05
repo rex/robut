@@ -66,7 +66,12 @@ scan_content() {
   for entry in "${PATTERNS[@]}"; do
     local desc="${entry%%|*}" rx="${entry#*|}"
     local hits
-    hits="$(printf '%s' "$content" | grep -nEo "$rx" 2>/dev/null | head -5 || true)"
+    # Apple's asset scale suffixes (`AppIcon-16@2x.png`) satisfy the email
+    # regex — local part, `2x` "domain", `.png` "TLD". They are file names
+    # mandated by the asset catalog, not addresses; drop that one shape.
+    hits="$(printf '%s' "$content" | grep -nEo "$rx" 2>/dev/null \
+      | { if [[ "$desc" == "email address" ]]; then grep -vE '@[0-9]x\.' || true; else cat; fi; } \
+      | head -5 || true)"
     if [[ -n "$hits" ]]; then
       red "  ✗ $label — $desc"
       while IFS= read -r h; do [[ -n "$h" ]] && printf '      %s\n' "$h"; done <<<"$hits"

@@ -61,8 +61,23 @@ everything-client for every AI provider. That restraint is the point.
 
 ## Install
 
-Signed, notarized, and published to [Releases](../../releases), with Sparkle
-for updates.
+1. Download `Robut-<version>.zip` from the latest
+   [release](../../releases/latest).
+2. Double-click the zip — macOS unpacks it into `Robut.app` right next to it.
+3. Drag `Robut.app` to `/Applications` and open it. It is signed with a
+   Developer ID and notarized by Apple, so it opens without any Gatekeeper
+   warning; the robot appears in your menubar.
+4. Click **Connect Claude** in the pane for live, float-resolution usage.
+   Robut signs in with its own token and never reads Claude Code's
+   credentials. Codex needs nothing — it is read from `~/.codex/sessions`.
+
+## Updates
+
+Robut checks for updates itself (Sparkle, once a day) and offers them in
+place; **Updates** in the pane footer checks on demand. Every update is
+signed with the same Developer ID as the build you installed — that is what
+keeps Robut's own keychain item working across versions with no prompts —
+and carries an EdDSA signature the app verifies before installing.
 
 ## Build from source
 
@@ -72,6 +87,7 @@ Requires Xcode 26+, plus `xcodegen` and `swiftlint` from Homebrew.
 make install       # verify toolchain
 make hooks         # install pre-commit gates
 make privacy-init  # generate your local privacy denylist
+make signing-init  # stable signing identity (or every rebuild re-prompts the keychain)
 make dev           # build + launch into the menubar
 ```
 
@@ -87,6 +103,16 @@ The `.xcodeproj` is generated from `project.yml` and never committed — run
 - `make validate` — privacy + lint + typecheck + architecture + version gates.
 - `make privacy` — scan the worktree for personal data.
 - `make regenerate` — rebuild `Robut.xcodeproj` from `project.yml`.
+
+Releasing (maintainer; needs a Developer ID certificate):
+
+- `make notary-init` — once: store notarization credentials in your keychain.
+- `make notarize` — archive a universal Release build, export it with
+  Developer ID + hardened runtime, notarize, staple.
+- `make release` — zip the stapled app, generate the EdDSA-signed Sparkle
+  appcast, tag `v<VERSION>`, publish both as GitHub Release assets. The
+  feed URL is `releases/latest/download/appcast.xml`, so GitHub's "latest"
+  redirect is the entire update-hosting story.
 
 ## Architecture
 

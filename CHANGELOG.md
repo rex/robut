@@ -30,6 +30,46 @@ version bumps).
 
 ---
 
+## [0.25.0] — 2026-09-05 — Agent: Claude Fable 5.1
+### Added
+- **The release pipeline (Slice 5.1).** `make notarize` archives a
+  universal Release build, exports it with Developer ID + hardened
+  runtime (`Config/ExportOptions.template.plist`; the Team ID is
+  substituted from the gitignored `Local.xcconfig`), submits it to
+  Apple's notary service, and staples the ticket. `make release` packages
+  the stapled app as a zip, generates a signed Sparkle appcast, tags
+  `vX.Y.Z`, and publishes both as GitHub Release assets. `make
+  notary-init` stores the App Store Connect credential in the login
+  keychain once — nothing enters the repo. Guards: `archive` refuses
+  ad-hoc signing (a differently-signed update re-prompts every user for
+  Robut's own keychain item — the founding bug, shipped at scale), and
+  `package` refuses an un-stapled app.
+- **Sparkle 2.9.6 auto-update** (SPM, pinned exact). The feed is
+  `releases/latest/download/appcast.xml` — a release asset, so GitHub's
+  "latest" redirect is the whole hosting story. Updates must carry the
+  maintainer's EdDSA signature (`SUPublicEDKey`; the private key lives
+  only in the login keychain) and the same Developer ID as the running
+  app. The updater starts only on a real launch — never under XCTest —
+  and the pane footer gains an "Updates" link.
+
+### Changed
+- `make build` (and everything piped through xcpretty) now pins a UTF-8
+  locale; a C/POSIX locale crashed xcpretty on non-ASCII build output.
+- README documents install (zip → Applications), Sparkle updates, and the
+  release targets; `AGENTS.md` §4/§9 record the release invariants — same
+  identity every release, notarized-only, Sparkle's silent-unsigned trap,
+  updater created after the XCTest guard, UTF-8 for xcpretty.
+- The privacy gate no longer reads Apple's `@2x` asset scale suffixes as
+  email addresses (`AppIcon-16@2x.png` satisfied the regex: a name, `2x`
+  as the domain, `.png` as the TLD).
+- The architecture gate excludes `DerivedData-test/`, `build/`, and
+  `dist/` — Sparkle's SPM checkout landed in the test derived data and its
+  Objective-C sources tripped the line limit.
+
+### Removed
+- Retired Serena targets and help section from the Makefile — debris left
+  behind by the 2026-09-03 removal.
+
 ## [0.24.0] — 2026-09-05 — Agent: Claude Fable 5.1
 ### Changed
 - Synced skeleton-owned files to agentic-skeleton v0.48.0: gate scripts

@@ -109,6 +109,13 @@ struct UsagePane: View {
             .buttonStyle(.link)
             .font(RobutFont.ui(model.claudeConnected ? 10 : 11, .medium))
 
+            // Sparkle's own window handles the rest. Absent under tests.
+            if let updates = AppUpdates.controller {
+                Button("Updates") { updates.checkForUpdates(nil) }
+                    .buttonStyle(.link)
+                    .font(RobutFont.ui(10, .medium))
+            }
+
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)
                 .font(RobutFont.ui(11, .medium))

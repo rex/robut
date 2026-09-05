@@ -68,6 +68,8 @@ reintroduces the exact bug this app exists to fix. See §9.
 ```
 project.yml       xcodegen manifest — SOURCE OF TRUTH for the Xcode project
 Local.xcconfig    signing identity (GITIGNORED — never commit)
+Config/           Signing.xcconfig (optional Local include) + ExportOptions template
+Scripts/          render-app-icon.swift — the icon, from the pixel robot's grid
 Robut/            app sources
   App/            @main entry, app model, DI
   Core/
@@ -137,6 +139,28 @@ change gets a corresponding test update.
   Also: test/typecheck build with `CODE_SIGNING_ALLOWED=NO` into
   `DerivedData-test/` so they don't re-sign the runnable app ad-hoc —
   launch via `make dev`, and don't point them back at `DerivedData/`.
+- **Every release is signed with the SAME Developer ID, and shipped
+  notarized.** `make archive` refuses to run ad-hoc and `make package`
+  refuses an un-stapled app, on purpose: a differently-signed update
+  changes the app's designated requirement, so macOS re-prompts every
+  user for Robut's OWN keychain item — the founding bug, at scale — and
+  Gatekeeper silently blocks an un-notarized download. Don't "just build
+  a zip" around either guard.
+- **Sparkle signs only when it can verify.** `generate_appcast` silently
+  writes an UNSIGNED appcast if the archived app's `SUPublicEDKey` is
+  missing or doesn't match the private key in the maintainer's login
+  keychain — no warning, exit 0. `make appcast` greps for
+  `sparkle:edSignature` and fails otherwise; keep that guard. The first
+  `make release` in a terminal asks Keychain to let `generate_appcast`
+  read the key (click Always Allow); headless sessions hang there.
+- **The updater is created AFTER the XCTest guard in `AppDelegate`.**
+  `SPUStandardUpdaterController` phones the feed on start; under `make
+  test` the app is only the test host. Don't hoist it into `init` or the
+  app struct — same class of bug as the startup network calls in §9's
+  first bullet.
+- **xcpretty needs a UTF-8 locale.** The Makefile exports `LC_ALL`; a
+  C/POSIX locale (headless shells) crashes it on non-ASCII build output
+  and the pipe reports a failed build that actually succeeded.
 - **`claude setup-token` is inference-only; it CANNOT read usage.**
   `/api/oauth/usage` is gated (in Claude Code's own binary) on both
   `user:inference` and `user:profile`; setup-token withholds

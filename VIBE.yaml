@@ -79,8 +79,13 @@ architecture:
     - "**/*.generated.*"
     - "**/node_modules/**"
     # Xcode build output — compiler-generated bridging headers routinely
-    # blow the line limit and are not source anyone maintains.
+    # blow the line limit and are not source anyone maintains. The test
+    # variant also holds SPM checkouts (Sparkle's own sources), and the
+    # release dirs hold the exported app.
     - "DerivedData/**"
+    - "DerivedData-test/**"
+    - "build/**"
+    - "dist/**"
     - "**/*.xcodeproj/**"
     - "build/**"
   max_lines_per_file:

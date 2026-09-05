@@ -14,7 +14,6 @@
         clean clean-all \
         docker-build docker-run docker-stop docker-clean \
         db-generate db-push db-migrate db-studio db-reset \
-        serena-index serena-cache-copy serena-dashboard \
         check-if-the-agent-can-consider-this-task-completed
 
 # ─── Configuration ────────────────────────────────────────────────────
@@ -25,6 +24,8 @@
 # POSIX-compatible — no `[[ ]]`, no `${var//foo/bar}` substitution, no
 # zsh globbing — so /bin/bash works as a true fallback.
 SHELL       := $(or $(wildcard /opt/homebrew/bin/zsh),$(shell command -v zsh),/bin/bash)
+# xcpretty is Ruby and dies on non-ASCII build output under a C/POSIX locale.
+export LC_ALL ?= en_US.UTF-8
 APP_NAME    ?= Robut
 DOCKER_IMAGE := $(APP_NAME):latest
 
@@ -102,10 +103,12 @@ help:
 	@echo "  $(GREEN)make update$(RESET)               Update dependencies"
 	@echo "  $(GREEN)make info$(RESET)                 Show project info"
 	@echo ""
-	@echo "$(BOLD)Serena (agent code intelligence)$(RESET)"
-	@echo "  $(GREEN)make serena-index$(RESET)         Pre-cache symbols for this project"
-	@echo "  $(GREEN)make serena-cache-copy$(RESET)    Copy .serena/cache to a worktree (WORKTREE=<path>)"
-	@echo "  $(GREEN)make serena-dashboard$(RESET)     Print dashboard URL"
+	@echo "$(BOLD)Release (Developer ID + notarization + Sparkle)$(RESET)"
+	@echo "  $(GREEN)make notary-init$(RESET)          One-time: store notarization credentials in your keychain"
+	@echo "  $(GREEN)make notarize$(RESET)             Archive → export → notarize → staple (build/release/)"
+	@echo "  $(GREEN)make release$(RESET)              Package → signed appcast → tag → GitHub Release"
+	@echo "  $(GREEN)make sparkle-keys-init$(RESET)    One-time: Sparkle EdDSA keypair (public key → Info.plist)"
+	@echo "  $(GREEN)make release-clean$(RESET)        Remove build/release and dist"
 	@echo ""
 	@echo "$(BOLD)Completion$(RESET)"
 	@echo "  $(GREEN)make check-if-the-agent-can-consider-this-task-completed$(RESET)"
@@ -343,144 +346,6 @@ info:
 	@echo "  Tree:    $$(git status --porcelain | wc -l | tr -d ' ') uncommitted changes"
 	@echo "  Port:    $(PORT)"
 
-# ─── Serena (agent code intelligence) ────────────────────────────────
-# Wraps the Serena MCP server's project-level commands so agents and
-# operators can pre-warm caches and reach the dashboard without
-# remembering the full uvx invocation. See
-# serena/references/protocol.md for full details.
-
-## serena-index: Pre-cache symbols for the current project
-serena-index:
-	@echo "$(CYAN)Indexing project for Serena...$(RESET)"
-	@uvx --from git+https://github.com/oraios/serena serena project index . \
-		|| { echo "$(RED)Serena index failed — is uvx installed?$(RESET)"; exit 1; }
-	@echo "$(GREEN)Index ready at .serena/cache/$(RESET)"
-
-## serena-cache-copy: Copy .serena/cache to a worktree (avoids re-indexing)
-serena-cache-copy:
-	@if [ -z "$(WORKTREE)" ]; then \
-		echo "$(RED)Usage: make serena-cache-copy WORKTREE=<path>$(RESET)"; \
-		exit 1; \
-	fi
-	@if [ ! -d ".serena/cache" ]; then \
-		echo "$(YELLOW)No .serena/cache here — run 'make serena-index' first.$(RESET)"; \
-		exit 1; \
-	fi
-	@if [ ! -d "$(WORKTREE)" ]; then \
-		echo "$(RED)Worktree path '$(WORKTREE)' does not exist.$(RESET)"; \
-		exit 1; \
-	fi
-	@mkdir -p "$(WORKTREE)/.serena"
-	@cp -r .serena/cache "$(WORKTREE)/.serena/cache"
-	@echo "$(GREEN)Cache copied → $(WORKTREE)/.serena/cache$(RESET)"
-
-## serena-dashboard: Print Serena dashboard URL (default localhost:24282)
-serena-dashboard:
-	@echo "$(CYAN)Serena dashboard:$(RESET) http://localhost:24282/dashboard/index.html"
-	@echo "$(YELLOW)(port increments if multiple instances are running)$(RESET)"
-
-# ─── Required-files + commit-surface gates ──────────────────────────
-
-## check-docs: Enforce VIBE.yaml docs.*_required (fails closed)
-check-docs:
-	@echo "$(CYAN)Checking required collaboration files (VIBE.yaml docs)...$(RESET)"
-	@if [ ! -f scripts/check_docs.py ]; then \
-		echo "$(RED)  scripts/check_docs.py is MISSING — the docs gate$(RESET)"; \
-		echo "$(RED)  cannot run. Hard failure. Re-run the bootstrap.$(RESET)"; \
-		exit 1; \
-	fi
-	@if command -v uv >/dev/null 2>&1; then \
-		uv run scripts/check_docs.py; \
-	elif python3 -c 'import yaml' >/dev/null 2>&1; then \
-		python3 scripts/check_docs.py; \
-	else \
-		echo "$(RED)  docs gate cannot run: no 'uv', no python3 + PyYAML.$(RESET)"; \
-		exit 1; \
-	fi
-
-## check-precommit: Verify the pre-commit hook is installed (fails closed)
-check-precommit:
-	@echo "$(CYAN)Checking the pre-commit enforcement surface...$(RESET)"
-	@if [ ! -f .pre-commit-config.yaml ]; then \
-		echo "$(RED)  .pre-commit-config.yaml is MISSING — the commit-time$(RESET)"; \
-		echo "$(RED)  enforcement surface is absent. Re-run the bootstrap.$(RESET)"; \
-		exit 1; \
-	fi
-	@if ! command -v pre-commit >/dev/null 2>&1; then \
-		echo "$(RED)  pre-commit is not installed — it is MANDATORY, not$(RESET)"; \
-		echo "$(RED)  optional. Install it: uv tool install pre-commit$(RESET)"; \
-		exit 1; \
-	fi
-	@HOOK=$$(git rev-parse --git-path hooks/pre-commit 2>/dev/null); \
-	if [ -z "$$HOOK" ] || [ ! -f "$$HOOK" ] || ! grep -q pre-commit "$$HOOK" 2>/dev/null; then \
-		echo "$(RED)  the pre-commit git hook is NOT installed. Run:$(RESET)"; \
-		echo "$(RED)    pre-commit install$(RESET)"; \
-		echo "$(RED)  A .pre-commit-config.yaml with no installed hook$(RESET)"; \
-		echo "$(RED)  enforces nothing — fail closed.$(RESET)"; \
-		exit 1; \
-	fi
-	@echo "$(GREEN)  pre-commit hook installed.$(RESET)"
-
-## check-skeleton: Report drift vs the installed agentic-skeleton
-check-skeleton:
-	@echo "$(CYAN)Checking skeleton-owned files for drift...$(RESET)"
-	@if [ ! -f scripts/sync_skeleton.py ]; then \
-		echo "$(RED)  scripts/sync_skeleton.py is MISSING — cannot check$(RESET)"; \
-		echo "$(RED)  skeleton drift. Re-run the agentic-skeleton bootstrap.$(RESET)"; \
-		exit 1; \
-	fi
-	@if command -v uv >/dev/null 2>&1; then \
-		uv run scripts/sync_skeleton.py --check; \
-	else \
-		python3 scripts/sync_skeleton.py --check; \
-	fi
-
-## sync-skeleton: Pull current skeleton-owned files into this repo
-sync-skeleton:
-	@if [ ! -f scripts/sync_skeleton.py ]; then \
-		echo "$(RED)  scripts/sync_skeleton.py is MISSING.$(RESET)"; \
-		exit 1; \
-	fi
-	@if command -v uv >/dev/null 2>&1; then \
-		uv run scripts/sync_skeleton.py --apply; \
-	else \
-		python3 scripts/sync_skeleton.py --apply; \
-	fi
-
-## check-skills: Advisory applied-skill provenance + drift report (never fails validate)
-check-skills:
-	@echo "$(CYAN)Checking applied-skill provenance...$(RESET)"
-	@if [ ! -f scripts/check_skills.py ]; then \
-		echo "$(YELLOW)  scripts/check_skills.py not present — run 'make sync-skeleton'.$(RESET)"; \
-	elif command -v uv >/dev/null 2>&1; then \
-		uv run scripts/check_skills.py || true; \
-	else \
-		python3 scripts/check_skills.py || true; \
-	fi
-
-## stamp-skill: Record that a skill was applied (SKILL=<id> [VERSION=x.y.z])
-stamp-skill:
-	@if [ -z "$(SKILL)" ]; then \
-		echo "$(RED)Usage: make stamp-skill SKILL=<id> [VERSION=x.y.z]$(RESET)"; exit 1; \
-	fi
-	@if [ ! -f scripts/stamp_skill.py ]; then \
-		echo "$(RED)  scripts/stamp_skill.py missing — run 'make sync-skeleton'.$(RESET)"; exit 1; \
-	fi
-	@if command -v uv >/dev/null 2>&1; then \
-		uv run scripts/stamp_skill.py "$(SKILL)" $(if $(VERSION),--version "$(VERSION)"); \
-	else \
-		python3 scripts/stamp_skill.py "$(SKILL)" $(if $(VERSION),--version "$(VERSION)"); \
-	fi
-
-# ─── Completion Gate ──────────────────────────────────────────────────
-
-## check-if-the-agent-can-consider-this-task-completed: Final verification gate
-check-if-the-agent-can-consider-this-task-completed: validate check-docs check-precommit test
-
-## help-stack: Show which lang-* skill should fill in stub targets
-help-stack:
-	@echo "$(BOLD)$(CYAN)Stub targets and their owning lang-* skills$(RESET)"
-	@echo ""
 	@echo "Greenfield Makefile targets that print '(stub — overlay a lang-* skill"
 	@echo "to fill this in)' need a stack-specific skill to overlay recipe bodies."
 	@echo "Pick the skill matching VIBE.yaml::project.stack:"
@@ -593,3 +458,118 @@ hooks:
 	@echo "$(GREEN)pre-commit + commit-msg hooks installed (privacy gate active).$(RESET)"
 
 .DEFAULT_GOAL := help
+
+# ─────────────────────────────────────────────────────────────────────
+# Release — Developer ID + notarization + Sparkle → GitHub Releases
+# ─────────────────────────────────────────────────────────────────────
+# Same VERSION and build number `make build` injects. INVARIANT: every
+# release is signed with the SAME Developer ID identity (Local.xcconfig).
+# A differently-signed update changes the app's designated requirement,
+# and macOS re-prompts every user for Robut's OWN keychain item — the
+# founding bug, shipped at scale. `archive` refuses to run ad-hoc.
+#
+# Flow:  make notarize   (archive → export → notarize → staple)
+#        make release    (package → appcast → tag → GitHub Release)
+RELEASE_DIR    := build/release
+ARCHIVE        := $(RELEASE_DIR)/$(APP_NAME).xcarchive
+EXPORT_DIR     := $(RELEASE_DIR)/export
+EXPORTED_APP   := $(EXPORT_DIR)/$(APP_NAME).app
+EXPORT_OPTIONS := $(RELEASE_DIR)/ExportOptions.plist
+NOTARY_LOG     := $(RELEASE_DIR)/notary.log
+DIST           := dist
+ZIP            := $(DIST)/$(APP_NAME)-$(MARKETING).zip
+APPCAST        := $(DIST)/appcast.xml
+NOTARY_PROFILE ?= robut-notary
+GITHUB_REPO    ?= rex/robut
+RELEASE_TAG    := v$(MARKETING)
+DOWNLOAD_BASE  := https://github.com/$(GITHUB_REPO)/releases/download/$(RELEASE_TAG)
+TEAM_ID        := $(shell sed -nE 's/^DEVELOPMENT_TEAM *= *([A-Z0-9]+).*/\1/p' Local.xcconfig 2>/dev/null)
+SPARKLE_BIN    := $(shell find $(DERIVED)/SourcePackages/artifacts -type d -path '*parkle*/bin' 2>/dev/null | head -1)
+
+.PHONY: archive export notary-init notarize package appcast release sparkle-keys-init release-clean
+
+release-clean:
+	@rm -rf $(RELEASE_DIR) $(DIST)
+	@echo "$(GREEN)Release artifacts cleared.$(RESET)"
+
+archive: regenerate
+	@if [ -z "$(TEAM_ID)" ]; then \
+		echo "$(RED)No Developer ID in Local.xcconfig — run 'make signing-init'.$(RESET)"; \
+		echo "$(RED)An ad-hoc build can never be notarized, and would re-prompt every user's keychain.$(RESET)"; \
+		exit 1; fi
+	@echo "$(CYAN)Archiving $(APP_NAME) $(RELEASE_TAG) (build $(BUILD_NUM)) — Release, universal, Developer ID...$(RESET)"
+	@rm -rf $(ARCHIVE)
+	@set -o pipefail; $(XCODEBUILD) -project $(PROJECT) -scheme $(SCHEME) \
+		-configuration Release -destination 'generic/platform=macOS' \
+		-derivedDataPath $(DERIVED) -archivePath $(ARCHIVE) \
+		ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+		MARKETING_VERSION=$(MARKETING) CURRENT_PROJECT_VERSION=$(BUILD_NUM) \
+		archive $(FMT)
+	@echo "$(GREEN)Archived → $(ARCHIVE)$(RESET)"
+
+export: archive
+	@sed 's/__TEAM_ID__/$(TEAM_ID)/' Config/ExportOptions.template.plist > $(EXPORT_OPTIONS)
+	@rm -rf $(EXPORT_DIR)
+	@set -o pipefail; $(XCODEBUILD) -exportArchive -archivePath $(ARCHIVE) \
+		-exportOptionsPlist $(EXPORT_OPTIONS) -exportPath $(EXPORT_DIR) $(FMT)
+	@codesign --verify --deep --strict --verbose=2 "$(EXPORTED_APP)"
+	@if codesign -d --entitlements - "$(EXPORTED_APP)" 2>/dev/null | grep -q app-sandbox; then \
+		echo "$(RED)App Sandbox is ON — that breaks every provider. See Robut.entitlements.$(RESET)"; exit 1; fi
+	@codesign -dvv "$(EXPORTED_APP)" 2>&1 | grep -q "Authority=Developer ID Application" \
+		|| { echo "$(RED)Export is not Developer-ID signed.$(RESET)"; exit 1; }
+	@codesign -dvv "$(EXPORTED_APP)" 2>&1 | grep -q "flags=.*runtime" \
+		|| { echo "$(RED)Hardened runtime missing — notarization would be refused.$(RESET)"; exit 1; }
+	@echo "$(GREEN)Exported → $(EXPORTED_APP)$(RESET)"
+
+notary-init:
+	@echo "$(BOLD)One-time: notarization credentials → your login keychain as profile '$(NOTARY_PROFILE)'.$(RESET)"
+	@echo "You need an APP-SPECIFIC PASSWORD: https://account.apple.com → Sign-In and Security → App-Specific Passwords."
+	@echo "Team ID (from Local.xcconfig): $(TEAM_ID)"
+	@printf "Apple ID email: "; read APPLE_ID; \
+		xcrun notarytool store-credentials "$(NOTARY_PROFILE)" --apple-id "$$APPLE_ID" --team-id "$(TEAM_ID)"
+	@echo "$(GREEN)Stored. 'make notarize' uses it; nothing touched the repo.$(RESET)"
+
+notarize: export
+	@xcrun notarytool history --keychain-profile "$(NOTARY_PROFILE)" >/dev/null 2>&1 \
+		|| { echo "$(RED)No notary credentials — run 'make notary-init' once.$(RESET)"; exit 1; }
+	@echo "$(CYAN)Submitting to Apple's notary service (this waits for the verdict)...$(RESET)"
+	@rm -f $(RELEASE_DIR)/notary-upload.zip
+	@ditto -c -k --keepParent "$(EXPORTED_APP)" $(RELEASE_DIR)/notary-upload.zip
+	@xcrun notarytool submit $(RELEASE_DIR)/notary-upload.zip \
+		--keychain-profile "$(NOTARY_PROFILE)" --wait 2>&1 | tee $(NOTARY_LOG)
+	@grep -q "status: Accepted" $(NOTARY_LOG) || { \
+		echo "$(RED)Not accepted. Details: xcrun notarytool log <submission-id> --keychain-profile $(NOTARY_PROFILE)$(RESET)"; exit 1; }
+	@xcrun stapler staple "$(EXPORTED_APP)"
+	@xcrun stapler validate "$(EXPORTED_APP)"
+	@spctl --assess --type execute --verbose=2 "$(EXPORTED_APP)"
+	@echo "$(GREEN)Notarized + stapled: $(EXPORTED_APP)$(RESET)"
+
+package:
+	@xcrun stapler validate "$(EXPORTED_APP)" >/dev/null 2>&1 \
+		|| { echo "$(RED)Not stapled — run 'make notarize' first. Never ship an un-notarized build.$(RESET)"; exit 1; }
+	@mkdir -p $(DIST); rm -f $(ZIP)
+	@ditto -c -k --keepParent "$(EXPORTED_APP)" $(ZIP)
+	@echo "$(GREEN)Packaged → $(ZIP)$(RESET)"
+
+sparkle-keys-init:
+	@if [ -z "$(SPARKLE_BIN)" ]; then echo "$(RED)Sparkle tools not found — run 'make build' once.$(RESET)"; exit 1; fi
+	@"$(SPARKLE_BIN)/generate_keys"
+	@echo "$(YELLOW)Public key above → Robut/Info.plist SUPublicEDKey. The private key stays in your login keychain.$(RESET)"
+
+appcast: package
+	@if [ -z "$(SPARKLE_BIN)" ]; then echo "$(RED)Sparkle tools not found — run 'make build' once.$(RESET)"; exit 1; fi
+	@"$(SPARKLE_BIN)/generate_appcast" --download-url-prefix "$(DOWNLOAD_BASE)/" $(DIST)
+	@grep -q "sparkle:edSignature" $(APPCAST) || { \
+		echo "$(RED)Appcast is UNSIGNED — generate_appcast silently skips signing when the app's$(RESET)"; \
+		echo "$(RED)SUPublicEDKey is missing or doesn't match the key in your keychain. Not shippable.$(RESET)"; exit 1; }
+	@echo "$(GREEN)Appcast (EdDSA-signed) → $(APPCAST)$(RESET)"
+
+release: appcast
+	@git diff --quiet && git diff --cached --quiet \
+		|| { echo "$(RED)Working tree not clean — commit first.$(RESET)"; exit 1; }
+	@awk -v v="$(MARKETING)" '$$0 ~ ("^## \\[" v "\\]") {f=1; next} /^## \[/ {if (f) exit} f' CHANGELOG.md > $(RELEASE_DIR)/notes.md
+	@git rev-parse "$(RELEASE_TAG)" >/dev/null 2>&1 || git tag -a "$(RELEASE_TAG)" -m "$(APP_NAME) $(RELEASE_TAG)"
+	@git push origin "$(RELEASE_TAG)"
+	@gh release create "$(RELEASE_TAG)" $(ZIP) $(APPCAST) \
+		--title "$(APP_NAME) $(RELEASE_TAG)" --notes-file $(RELEASE_DIR)/notes.md
+	@echo "$(GREEN)Released $(RELEASE_TAG) → https://github.com/$(GITHUB_REPO)/releases/tag/$(RELEASE_TAG)$(RESET)"

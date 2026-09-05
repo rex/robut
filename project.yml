@@ -33,6 +33,15 @@ configFiles:
   Debug: Config/Signing.xcconfig
   Release: Config/Signing.xcconfig
 
+# Sparkle auto-update (ADR: Infra = GitHub Releases + Sparkle). Pinned to an
+# exact version on purpose — the resolved lockfile lives inside the
+# generated .xcodeproj and is never committed, so this line IS the pin.
+# Bump deliberately; a release must know exactly which Sparkle it ships.
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.6
+
 targets:
   # ============================================================
   # Robut — the menubar app. LSUIElement, so no Dock icon.
@@ -49,6 +58,8 @@ targets:
           - "**/.DS_Store"
       - path: Robut/PrivacyInfo.xcprivacy
         type: file
+    dependencies:
+      - package: Sparkle
     settings:
       groups: [common]
       base:

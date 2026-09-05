@@ -10,8 +10,21 @@
 // once, after AppKit is fully up.
 
 import AppKit
+import Sparkle
+
+/// The pane's hook for "Check for Updates…". nil under tests and before
+/// launch — see `AppDelegate`, which is the only writer.
+@MainActor
+enum AppUpdates {
+    static var controller: SPUStandardUpdaterController?
+}
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Sparkle. Created only for a REAL launch: under XCTest the app is
+    /// merely the test host, and an updater that phones the feed from a
+    /// test run is exactly the class of startup network call §9 forbids.
+    private var updater: SPUStandardUpdaterController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Register the self-hosted Geist / Geist Mono faces once, before any
         // pane renders. Idempotent, local, and harmless under tests.
@@ -36,6 +49,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.notice("applicationDidFinishLaunching")
         AppModel.shared.start()
         observeWake()
+
+        // Scheduled checks per Info.plist (SUFeedURL, SUEnableAutomaticChecks).
+        // The feed is a GitHub release asset; updates are EdDSA-signed AND
+        // must carry the same Developer ID as the running app.
+        let controller = SPUStandardUpdaterController(
+            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+        )
+        updater = controller
+        MainActor.assumeIsolated { AppUpdates.controller = controller }
     }
 
     /// Refresh immediately when the Mac wakes. Usage is hours stale after

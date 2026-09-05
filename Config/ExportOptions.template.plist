@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ExportOptions for `xcodebuild -exportArchive`, Developer ID flavour.
+
+         This is a TEMPLATE: `make export` substitutes __TEAM_ID__ from the
+         gitignored Local.xcconfig into build/release/ExportOptions.plist.
+         PUBLIC REPO — a Team ID is personal data and never lands here. -->
+
+    <!-- Mac outside-store distribution: Developer ID + notarization. -->
+    <key>method</key>
+    <string>developer-id</string>
+
+    <key>teamID</key>
+    <string>__TEAM_ID__</string>
+
+    <!-- The same Developer ID identity every release, on purpose: an
+         update signed differently changes the app's designated requirement
+         and macOS re-prompts every user for Robut's OWN keychain item -
+         the founding bug, shipped at scale. -->
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>Developer ID Application</string>
+
+    <!-- Write the app to disk; nothing is uploaded from here. Notarization
+         is a separate, explicit step (`make notarize`). -->
+    <key>destination</key>
+    <string>export</string>
+
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>uploadSymbols</key>
+    <false/>
+</dict>
+</plist>
