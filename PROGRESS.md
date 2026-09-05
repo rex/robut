@@ -6,12 +6,14 @@
 - **Project**: Robut — macOS menubar AI-usage tracker (Swift 6 / SwiftUI /
   xcodegen). Shows Claude + Codex usage with burn-rate projection.
 - **Active branch**: `main`
-- **Version**: v0.21.0 — API-first Claude usage live; 139 tests green.
+- **Version**: v0.26.x — release pipeline built + Sparkle; loop-stall
+  fixed; all gates green.
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
-- **Last session**: 2026-07-30 (Claude Fable 5). Shipped the alarm split
-  (v0.19), diagnosed the CLI sampler collapse, resurrected OAuth with the
-  refresh race fixed (v0.20, ADR-0001), fixed the `limits` wire shape
-  (v0.21). API path verified live; weekly reset captured end-to-end.
+- **Last session**: 2026-09-05 (Claude Fable 5.1). Skeleton sync; Slice
+  5.1 (Developer ID export, notarization + Sparkle targets, appcast as
+  a release asset) dry-run verified up to the notary gate; diagnosed and
+  fixed the 19h refresh-loop stall + the keychain "no token" latch;
+  16×16 robot candidates rendered for the maintainer's pick.
 
 ## Current state (one line)
 
@@ -35,6 +37,15 @@ alarm-gated colour and the projection marker.
 - 2026-07-23 Integrated the Robut Design System (claude.ai design project):
   a Swift `Theme` (status colours sourced from `RobotMood.nsTint`), self-hosted
   Geist/Geist Mono, and a full pane rebuild + the pace marker. v0.16.0.
+- 2026-09-05 **Release = zip + Sparkle appcast as GitHub Release assets**
+  (feed `releases/latest/download/appcast.xml`); `make notarize` then
+  `make release`; every release signed with the same Developer ID;
+  `archive` refuses ad-hoc, `package` refuses un-stapled, `appcast`
+  refuses unsigned. App icon parked: the maintainer rejected the 8×8
+  robot; 16×16 replacement pending his pick.
+- 2026-09-05 **The loop must never await an unbounded fetch**: runner
+  rebuilt around the termination handler; `AppModel.bounded` budgets
+  every fetch; keychain read failures retry instead of latching.
 - 2026-07-30 **API-first Claude (ADR-0001)**: the CLI sampler collapsed
   under load (1–3 samples/day; blackout before a reset), so the OAuth
   layer returned with its killer fixed — `ClaudeTokenManager`, a

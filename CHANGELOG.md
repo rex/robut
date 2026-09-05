@@ -30,6 +30,13 @@ version bumps).
 
 ---
 
+## [0.26.1] — 2026-09-05 — Agent: Claude Fable 5.1
+### Changed
+- `TASK_STATE.md` (§0/§1/§2/§5/§6) and `PROGRESS.md` record the session:
+  Slice 5.1 built and dry-run verified up to the notary gate, the
+  loop-stall post-mortem, the rejected 8×8 robot and the pending 16×16
+  pick, and the exact first-release steps for the maintainer.
+
 ## [0.26.0] — 2026-09-05 — Agent: Claude Fable 5.1
 ### Fixed
 - **The refresh loop could die — and did, for 19 hours.** Diagnosed live

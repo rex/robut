@@ -5,7 +5,7 @@
 > and context compactions.
 >
 > Spec: `specs/<slug>/spec.md` · Plan: `specs/<slug>/plan.md`
-> Branch: `main` · Owner: repo maintainer · Last update: 2026-07-23 by Claude Opus 4.8
+> Branch: `main` · Owner: repo maintainer · Last update: 2026-09-05 by Claude Fable 5.1
 
 ## 0. TL;DR for a fresh agent session
 
@@ -34,16 +34,21 @@ estimates, all local + read-only, read via `model.stats.snapshot()`.
   severity is alarm-gated (`PaceEngine+Alarm`, v0.19) — outlook is fact,
   alarm is consequence; colour follows the alarm.
 
-**Current context:** the API path went live 2026-07-30 (~03:00), the
-same minute a weekly reset was captured end-to-end — the first quality
-prior-epoch peak and a quota-estimator calibration point. Claude Design
-is still designing the STATS DISPLAY (`docs/stats-matrix.md`). Everything
-green (139 tests / 31 suites, lint, privacy, architecture).
+**Current context (2026-09-05):** Slice 5.1 — the release pipeline — is
+BUILT and dry-run verified (`make export` → universal, Developer ID,
+hardened runtime, Sparkle embedded and validated) but NOT yet released:
+notarization needs the maintainer's one-time `make notary-init`. The
+refresh loop's 19-hour stall (a `waitUntilExit` race) and the "no token"
+latch after a keychain failure are fixed (v0.26.0). The 8×8 menubar
+robot is REJECTED by the maintainer; 16×16 candidates (scratch sheets
+"A antenna boxhead" / "B bolt-ears" with all four moods) await his pick
+— the app icon is parked until the glyph is settled. Claude Design is
+still designing the STATS DISPLAY (`docs/stats-matrix.md`).
 
-**Next planned work:** build the stats display once Claude Design's
-design lands (sync it via the DesignSync tool, same flow as the pane
-rebuild); then distribution (Slice 5.1). Nothing is mid-flight; safe to
-pause here.
+**Next planned work:** (1) maintainer runs `make notary-init`, then
+`make notarize && make release` for the first tagged release; (2) port
+the chosen 16×16 robot into `RobotMood.pixels` (+ `RobotIcon` scale) and
+render the app icon from it; (3) stats display once the design lands.
 
 **Read `AGENTS.md` §1 and §9 before touching anything.** This is a **public
 repo** — no personal data, ever (`make privacy`; a commit-msg gate scans
@@ -84,7 +89,7 @@ keychain-prompt bug returns).
 | 4.5 | Pace forgiveness | ✅ done | Two-regime engine: lived rate + evidence gate + prior weeks (v0.17.0) |
 | 4.7 | Stats capture | ✅ done | `Core/Stats/` ledger — tokens, insights, cost, quota estimates (v0.18.0) |
 | 4.8 | Stats display | 🟡 external | Claude Design designing from `docs/stats-matrix.md`; build after |
-| 5 | Distribution | ⏸ pending | Signed, notarized, Sparkle auto-update, published to Releases |
+| 5 | Distribution | 🟡 built | Pipeline + Sparkle shipped (v0.25.0); first release awaits `make notary-init` |
 | 6 | CI | ⏸ pending | `macos-latest` workflow: build + test + lint + privacy |
 
 Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
@@ -118,12 +123,23 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ### Slice 5.1 — Sign, notarize, Sparkle, Releases
 
-- Status: ⏸ pending
-- Context: `make signing-init` already writes `Local.xcconfig` (gitignored)
-  from the Developer ID. Add Sparkle via SPM. Hardened Runtime is on; App
-  Sandbox must stay OFF (Robut reads `~/.codex` and spawns `claude`). No
-  app icon asset catalog yet (`AppIcon` referenced but absent) — design it
-  from the pixel-robot logo.
+- Status: 🟡 built (v0.25.0, 2026-09-05) — awaiting the maintainer's
+  one-time `make notary-init`, then `make notarize && make release`.
+- Shipped: `make archive/export/notarize/package/appcast/release` +
+  `notary-init` / `sparkle-keys-init` / `release-clean`;
+  `Config/ExportOptions.template.plist` (Team ID substituted at build);
+  Sparkle 2.9.6 (SPM, exact pin), `SUFeedURL` = release asset via
+  `releases/latest/download/appcast.xml`, `SUPublicEDKey` in Info.plist;
+  updater created after the XCTest guard; "Updates" in the pane footer.
+- Dry-run verified: `make export` → universal, Developer ID, hardened
+  runtime, timestamped, identity-based DR, Sparkle XPC services valid;
+  `spctl` says "Unnotarized Developer ID" — the expected pre-notary state.
+- Acceptance (remaining):
+  - [ ] `make notarize` → "status: Accepted", stapled, `spctl` accepts.
+  - [ ] `make release` → tag `v<VERSION>` + zip + appcast on GitHub.
+  - [ ] Install from the zip on a clean account: opens without warning.
+  - [ ] Cut a second release; the first install offers the update.
+  - [ ] App icon — parked on the 16×16 robot decision (§5 item 2).
 
 ## 3. Blockers / open questions
 
@@ -212,59 +228,67 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 5. Next actions (ordered)
 
-1. **Stats display** — Claude Design has `docs/stats-matrix.md` (also in
-   the design project as `stats-matrix.md`); possibly a standalone
-   data-exploration window. Build only after their design lands. The data
-   is already flowing (`model.stats.snapshot()`).
-2. Slice 5.1 — signing, notarization, Sparkle, Releases + app icon (no asset
-   catalog yet; `AppIcon` is referenced in `project.yml` but absent).
-3. CI (`macos-latest`: build + test + lint + privacy).
-4. Watch the long-horizon verdicts over real days (§3) — tune
-   `PaceEngine+LongHorizon` constants only against observed weeks.
-5. Optional: import the remaining brand PNGs (mascot/wordmark/lockups) into an
-   asset catalog for onboarding/marketing surfaces — fonts are already
-   vendored, but the PNGs still live only in the design project.
+1. **First release (maintainer).** `make notary-init` once — it asks
+   for your Apple ID email and an APP-SPECIFIC PASSWORD (account.apple.com
+   → Sign-In and Security → App-Specific Passwords); the Team ID comes
+   from `Local.xcconfig`. Then `make notarize && make release`. The
+   first `make release` in a terminal asks Keychain to let
+   `generate_appcast` read the Sparkle key — click Always Allow. Verify
+   `spctl --assess --type execute build/release/export/Robut.app` says
+   "Notarized Developer ID", then install the zip from the GitHub
+   Release on a clean user account.
+2. **Menubar robot → 16×16.** The maintainer rejected the 8×8 glyph.
+   Candidate sheets (A "antenna boxhead" recommended, B "bolt-ears", all
+   four moods each) were rendered 2026-09-05 — awaiting his pick. Then:
+   port the four grids into `RobotMood.pixels`, make sure `RobotIcon`
+   renders a 16-column grid at menubar size, and render the app icon
+   from the new calm face (the asset catalog + `render-app-icon.swift`
+   from this session are parked in the session scratchpad; recreate from
+   the chosen grid). Re-sync the brand in the design project afterwards
+   (DesignSync needs an interactive `/design-login`).
+3. **Stats display** — Claude Design has `docs/stats-matrix.md`; build
+   only after their design lands (`model.stats.snapshot()` is flowing).
+4. CI (`macos-latest`: build + test + lint + privacy) — deferred until
+   requested; the release targets are manual by design.
+5. Watch the long-horizon verdicts over real weeks (§3). With 2-minute
+   API sampling restored, prior-epoch learning finally has clean input;
+   re-tune `PaceEngine+Alarm` / `+LongHorizon` only against replayed
+   history.
 
-## 6. Handoff note (compaction, 2026-07-23, v0.18.0)
+## 6. Handoff note (2026-09-05, v0.26.x)
 
-**State:** Robut is fully built, running, and correct at **v0.18.0**.
-Working tree clean, all pushed, all gates green (84 tests / 20 suites,
-lint, privacy, architecture, module-rules). Three major slices shipped
-this session, all verified live:
+**State:** working tree clean, all pushed, all gates green (lint,
+typecheck, privacy, architecture, module-rules, version-gate; test suite
+"Test Succeeded" — the xcpretty summary no longer prints a count).
 
-1. **Design-system integration (v0.16.0)** — `Theme` tokens (status
-   colours sourced from `RobotMood.nsTint`), self-hosted Geist/Geist Mono
-   (CoreText `wght` axis), pane rebuilt to the DS kit, pace marker.
-2. **Two-regime pace engine (v0.17.0)** — <24h to reset: original sharp
-   engine; ≥24h: lived rate over ≤72h (`PacePattern.livedRate`, sleep in
-   the denominator) + prior-epoch peak learning (retention 35d) + red
-   gated on ≥24h evidence. Fixed the 7%-weekly false red — verified live
-   (robot went green on the same data). Glow wash now full-height.
-3. **Statistics capture (v0.18.0)** — `Core/Stats/`: cursor-incremental
-   scanners over both transcript stores, `/usage` analytics parser,
-   prompt activity, plan/credits, `PriceTable`, tokens-per-percent quota
-   correlator. First live scan captured months of history across both
-   providers and produced real quota estimates. Read model:
-   `await model.stats.snapshot()`.
+**Shipped this session:** skeleton sync to v0.48.0 (v0.24.0); the release
+pipeline + Sparkle (v0.25.0, `c89f469`); the refresh-loop resilience
+fix (v0.26.0, `47ac34c`).
 
-**Now:** Claude Design is designing the STATS DISPLAY from
-`docs/stats-matrix.md` (also in the design project as `stats-matrix.md`;
-a standalone data-exploration window is under consideration). When their
-design lands, sync it with the DesignSync tool (list_projects →
-"Robut Design System" → read files) exactly like the pane rebuild, and
-build the display on `model.stats.snapshot()` + `PriceTable.cost(of:model:)`.
+**Load-bearing facts for whoever picks this up:**
+- `make notarize` = archive → export → notarize → staple into
+  `build/release/`; `make release` = package → appcast → tag →
+  `gh release create`. Guards: `archive` refuses without a Team ID in
+  `Local.xcconfig`; `package` refuses an un-stapled app; `appcast` fails
+  without `sparkle:edSignature`. `make export` was dry-run verified:
+  universal, hardened runtime, timestamped, identity-based designated
+  requirement, Sparkle's XPC services validated.
+- Sparkle feed = `https://github.com/rex/robut/releases/latest/download/appcast.xml`
+  (release asset). `SUPublicEDKey` is in `Info.plist`; the private key
+  is in the maintainer's login keychain (a pre-existing Sparkle key was
+  found there and reused). `generate_appcast` silently writes an
+  UNSIGNED appcast if the archived app's public key is missing — the
+  scratch test proved it, hence the guard.
+- The 19-hour stall: `ClaudeCLI.run` parked in `waitUntilExit` with no
+  child (Foundation loses the exit notification when `terminate()` races
+  the child's exit). Runner rebuilt on the termination handler;
+  `AppModel.bounded` budgets every fetch (4 min); `RobutKeychain.read`
+  throws on failure and the manager retries instead of latching.
+- The running app before this session had been on CLI fallback since
+  09-01 (keychain read failed at a launchd-outage launch; last token
+  rotation 08-26). After relaunch the manager retries the keychain; if
+  the Aug-26 refresh token is dead the footer reads "Claude · sign in
+  again" and the maintainer reconnects via the pane.
+- Icon: NOT shipped. Any icon must come from the new 16×16 glyph.
 
-**Watch items:** §3 — long-horizon verdicts over real days (windows read
-"Measuring pace…" until their id has 24h of lived history; tune
-`PaceEngine+LongHorizon` constants only against observed weeks).
-
-**Traps not to re-introduce** are ALL in `AGENTS.md` §9 — read it. The
-newest: the stats layer is read-only + cursor-incremental (never full
-rescans, never writes to provider dirs, guarded from `make test`); local
-tokens ≠ account usage; Claude tokens live in `usage.iterations`; Codex
-`token_count` is cumulative. Plus the standing ones: no keychain/OAuth
-(zero credentials), `make signing-init` before building, `MenuBarExtra`
-label limits, never auto-retry auth, status colours only in
-`RobotMood.nsTint`, pace engine is two regimes — don't unify.
-
-<!-- Older handoffs live in git history; §4 + CHANGELOG carry the facts. -->
+Older handoffs live in git history; §4 + CHANGELOG carry the facts.
