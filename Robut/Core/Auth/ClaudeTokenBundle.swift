@@ -72,14 +72,16 @@ struct ClaudeTokenBundle: Codable, Sendable, Equatable {
 /// Persistence seam for the bundle, injectable so tests never touch a
 /// real keychain. Only ClaudeTokenManager may call these.
 struct ClaudeTokenStore: Sendable {
-    var load: @Sendable () -> ClaudeTokenBundle?
+    /// nil = no token. A THROW means the keychain couldn't be consulted —
+    /// the manager retries later rather than concluding "no token".
+    var load: @Sendable () throws -> ClaudeTokenBundle?
     var save: @Sendable (ClaudeTokenBundle) -> Void
     var clear: @Sendable () -> Void
 
     /// The real store, backed by Robut's own keychain item.
     static let keychain = ClaudeTokenStore(
         load: {
-            guard let json = RobutKeychain.read(.claudeToken),
+            guard let json = try RobutKeychain.read(.claudeToken),
                   let data = json.data(using: .utf8),
                   let bundle = try? JSONDecoder().decode(ClaudeTokenBundle.self, from: data)
             else { return nil }

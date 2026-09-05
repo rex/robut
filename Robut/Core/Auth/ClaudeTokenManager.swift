@@ -62,6 +62,9 @@ actor ClaudeTokenManager {
         return cached != nil
     }
 
+    /// The refresh token was rejected; only a fresh sign-in clears it.
+    var signInRequired: Bool { needsSignIn }
+
     /// A usable bundle, refreshing first if needed. Single-flight: any
     /// number of concurrent callers produce at most ONE network refresh.
     func validBundle(now: Date) async -> Outcome {
@@ -140,7 +143,15 @@ actor ClaudeTokenManager {
 
     private func loadIfNeeded() {
         guard !loaded else { return }
-        loaded = true
-        cached = store.load()
+        do {
+            cached = try store.load()
+            loaded = true
+        } catch {
+            // The keychain itself failed — securityd unreachable during a
+            // launchd outage, say. That is NOT "no token". Leave `loaded`
+            // false so the next tick asks again; latching here is what
+            // parked the app on CLI fallback from 2026-09-01 until relaunch.
+            Log.auth.notice("claude token keychain read failed; will retry")
+        }
     }
 }

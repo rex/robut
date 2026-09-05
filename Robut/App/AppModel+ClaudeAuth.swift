@@ -14,7 +14,10 @@ extension AppModel {
     /// Re-mirror the token state for synchronous UI reads. Reads Robut's
     /// OWN keychain item, so this never prompts.
     func refreshClaudeConnected() async {
-        claudeConnected = await claudeAuth.hasToken
+        let hasToken = await claudeAuth.hasToken
+        let stale = await claudeAuth.signInRequired
+        claudeConnected = hasToken && !stale
+        claudeNeedsSignIn = hasToken && stale
     }
 
     /// Start sign-in: generate PKCE and return the URL to open in the

@@ -50,6 +50,11 @@ final class AppModel {
     /// `claudeConnected`, the sync UI mirror of `claudeAuth.hasToken`).
     var pendingPKCE: ClaudePKCE?
     var claudeConnected = false
+    /// A token exists but its refresh token was rejected — only a fresh
+    /// sign-in helps, and the footer must say so instead of "✓".
+    var claudeNeedsSignIn = false
+    /// Hard budget per source fetch — see `bounded`.
+    let fetchTimeout: TimeInterval
     private var ticker: Task<Void, Never>?
     private var didSeedHistory = false
 
@@ -57,14 +62,18 @@ final class AppModel {
     /// until X" is skipped entirely until X — this is what stops a
     /// rejected credential from being retried on a timer, which is how
     /// Robut previously got this machine IP-rate-limited by Anthropic.
-    private var nextFetchAllowed: [Provider: Date] = [:]
+    var nextFetchAllowed: [Provider: Date] = [:]
 
     init(
         sources: [any UsageSource]? = nil,
         history: UsageHistoryStore = UsageHistoryStore(),
         stats: UsageStatsStore = UsageStatsStore(),
-        claudeAuth: ClaudeTokenManager = ClaudeTokenManager()
+        claudeAuth: ClaudeTokenManager = ClaudeTokenManager(),
+        // The CLI's worst case is four 45s attempts plus an auth probe;
+        // anything slower than this is hung, not slow.
+        fetchTimeout: TimeInterval = 4 * 60
     ) {
+        self.fetchTimeout = fetchTimeout
         // Codex reads local session files. Claude prefers the API with
         // Robut's OWN token (float resolution, deterministic — ADR-0001)
         // and falls back to the `claude` CLI, which also carries the
@@ -156,10 +165,12 @@ final class AppModel {
         let due = sources.filter { isDue($0.provider, at: now) }
         guard !due.isEmpty else { return }
 
-        // Sources are independent; a slow one must not delay the others.
+        // Sources are independent; a slow one must not delay the others —
+        // and NONE may hold the loop past its budget (see `bounded`).
+        let budget = fetchTimeout
         let results = await withTaskGroup(of: (Provider, ProviderState).self) { group in
             for source in due {
-                group.addTask { (source.provider, await source.fetch(now: now)) }
+                group.addTask { (source.provider, await Self.bounded(source, now: now, timeout: budget)) }
             }
             var collected: [(Provider, ProviderState)] = []
             for await result in group { collected.append(result) }
@@ -185,6 +196,9 @@ final class AppModel {
         await recomputeVerdicts(now: now)
         lastRefresh = now
         scheduleStatsCapture(now: now)
+        // A dead refresh token latches inside the manager mid-loop; keep
+        // the footer honest about it.
+        await refreshClaudeConnected()
     }
 
     private func recomputeVerdicts(now: Date) async {
@@ -212,38 +226,4 @@ final class AppModel {
         )
     }
 
-    // MARK: - Back-off
-
-    private func isDue(_ provider: Provider, at now: Date) -> Bool {
-        guard let until = nextFetchAllowed[provider] else { return true }
-        return now >= until
-    }
-
-    private func applyBackoff(_ policy: RetryPolicy, to provider: Provider, at now: Date) {
-        switch policy {
-        case .normal:
-            nextFetchAllowed[provider] = nil
-        case .after(let pause):
-            nextFetchAllowed[provider] = now.addingTimeInterval(pause)
-        case .userAction:
-            // Only an explicit user action clears this. Retrying a
-            // rejected credential on a timer is a self-inflicted DoS.
-            nextFetchAllowed[provider] = .distantFuture
-        }
-    }
-
-    /// Clear every gate and refresh now. Only ever called from a genuine
-    /// user action (the Refresh button, saving a token).
-    func retryNow() async {
-        nextFetchAllowed.removeAll()
-        await refresh()
-    }
-
-    /// Providers in a non-ready state, for the pane's muted footer rows.
-    var unavailable: [(provider: Provider, state: ProviderState)] {
-        states
-            .filter { $0.value.snapshot == nil }
-            .map { (provider: $0.key, state: $0.value) }
-            .sorted { $0.provider.rawValue < $1.provider.rawValue }
-    }
 }

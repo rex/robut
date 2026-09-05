@@ -215,4 +215,29 @@ struct ClaudeTokenManagerTests {
         await manager.signOut()
         #expect(await manager.validBundle(now: t0) == .noToken)
     }
+
+    @Test("A failed keychain read is retried next tick — never latched as 'no token'")
+    func keychainFailureIsRetried() async {
+        // Live incident (2026-09-01): the app launched during a launchd
+        // outage, the keychain read failed, and "no token" stuck for the
+        // whole process lifetime — CLI fallback for days with a valid
+        // token sitting in the keychain.
+        struct KeychainDown: Error {}
+        let attempts = LockedBox(0)
+        let live = freshBundle()
+        let store = ClaudeTokenStore(
+            load: {
+                attempts.mutate { $0 += 1 }
+                if attempts.value == 1 { throw KeychainDown() }
+                return live
+            },
+            save: { _ in },
+            clear: {}
+        )
+        let manager = ClaudeTokenManager(store: store, refresher: { _ in live })
+
+        #expect(await manager.validBundle(now: t0) == .noToken)      // keychain down
+        #expect(await manager.validBundle(now: t0) == .bundle(live)) // recovered
+        #expect(attempts.value == 2)
+    }
 }

@@ -35,16 +35,28 @@ enum RobutKeychain {
 
     // MARK: - Read
 
-    /// Returns nil when absent. Never prompts: we created this item.
-    static func read(_ item: Item) -> String? {
+    /// Returns nil when the item is ABSENT. THROWS when the keychain
+    /// itself failed — securityd unreachable, interaction not allowed.
+    /// Callers must not read a failure as "no token": the app launched
+    /// into exactly that during a system-wide launchd outage (2026-09-01)
+    /// and sat on CLI fallback for days. Never prompts: we created this
+    /// item.
+    static func read(_ item: Item) throws -> String? {
         var query = baseQuery(item)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
+        switch status {
+        case errSecSuccess:
+            break
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw KeychainError.unexpectedStatus(status)
+        }
+        guard let data = result as? Data,
               let value = String(data: data, encoding: .utf8)
         else { return nil }
 
@@ -52,7 +64,7 @@ enum RobutKeychain {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    static func has(_ item: Item) -> Bool { read(item) != nil }
+    static func has(_ item: Item) -> Bool { (try? read(item)) != nil }
 
     // MARK: - Write
 

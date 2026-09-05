@@ -30,6 +30,34 @@ version bumps).
 
 ---
 
+## [0.26.0] — 2026-09-05 — Agent: Claude Fable 5.1
+### Fixed
+- **The refresh loop could die — and did, for 19 hours.** Diagnosed live
+  from a process sample: a thread parked in `ClaudeCLI.run → waitUntilExit`
+  with no child left to wait for. Foundation loses the exit notification
+  when the watchdog's `terminate()` races the child's own exit, and the
+  loop awaits every fetch, so one hung spawn stopped ALL sampling until
+  relaunch (manual Refresh worked only because the supersede guard lets a
+  NEW refresh bypass the stuck one). The runner is rebuilt around the
+  termination handler — no synchronous wait, no read-to-EOF a grandchild
+  could pin, terminate → SIGKILL → guaranteed resume. Pinned by
+  `ClaudeCLIRunnerTests` (hung child; orphan holding the pipe).
+- **Every fetch now has a hard budget** (`AppModel.bounded`, 4 minutes):
+  a source that never answers is marked timed-out with a back-off and
+  the loop moves on. `AppModelRefreshTests` pins it.
+- **A failed keychain read is no longer latched as "no token".** The app
+  launched on 2026-09-01 during a system-wide launchd outage; the keychain
+  read failed once, the manager cached "nothing", and the app sat on CLI
+  fallback for four days with a valid token in the keychain (last
+  rotation 08-26). `RobutKeychain.read` now distinguishes absent from
+  failed; the manager retries next tick.
+
+### Changed
+- The footer says "Claude · sign in again" when the refresh token was
+  rejected, instead of a misleading "Claude ✓"; re-mirrored after every
+  refresh cycle.
+- Fetch budget and back-off moved to `AppModel+Fetching.swift` (line limit).
+
 ## [0.25.0] — 2026-09-05 — Agent: Claude Fable 5.1
 ### Added
 - **The release pipeline (Slice 5.1).** `make notarize` archives a

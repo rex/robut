@@ -102,12 +102,11 @@ struct UsagePane: View {
             Spacer()
 
             // The upgrade path (ADR-0001): float-resolution usage via
-            // Robut's own token. Quiet once connected.
-            Button(model.claudeConnected ? "Claude ✓" : "Connect Claude") {
-                showClaudeSetup.toggle()
-            }
-            .buttonStyle(.link)
-            .font(RobutFont.ui(model.claudeConnected ? 10 : 11, .medium))
+            // Robut's own token. Quiet once connected; loud only when a
+            // dead refresh token means only the user can fix it.
+            Button(claudeFooterLabel) { showClaudeSetup.toggle() }
+                .buttonStyle(.link)
+                .font(RobutFont.ui(model.claudeConnected ? 10 : 11, .medium))
 
             // Sparkle's own window handles the rest. Absent under tests.
             if let updates = AppUpdates.controller {
@@ -123,6 +122,11 @@ struct UsagePane: View {
         }
         .padding(.horizontal, Theme.Metrics.padX)
         .padding(.vertical, Theme.Metrics.footerPad)
+    }
+
+    private var claudeFooterLabel: String {
+        if model.claudeNeedsSignIn { return "Claude · sign in again" }
+        return model.claudeConnected ? "Claude ✓" : "Connect Claude"
     }
 
     private var hairline: some View {

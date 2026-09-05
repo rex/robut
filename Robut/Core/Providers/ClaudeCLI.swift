@@ -112,9 +112,22 @@ enum ClaudeCLI {
 
     // MARK: - Process
 
-    /// Run a short-lived command, returning stdout. Kills it on timeout so
-    /// a wedged CLI can never wedge Robut.
-    private static func run(
+    /// Run a short-lived command, returning stdout. GUARANTEED to return
+    /// within `timeout` plus a few seconds, whatever the child does.
+    ///
+    /// The first version read the pipe to EOF and then called
+    /// `waitUntilExit()`. Foundation can lose the exit notification when
+    /// the watchdog's `terminate()` races the child's own exit, and
+    /// `waitUntilExit` then blocks forever — with no child left to wait
+    /// for. One such call held the refresh loop hostage for 19 hours
+    /// (2026-09-04): the loop awaits every fetch, so one hung spawn stops
+    /// ALL sampling until relaunch. Nothing here waits on the process
+    /// synchronously any more. The termination handler resumes with the
+    /// collected output; the watchdog resumes with nil after terminate →
+    /// SIGKILL; whichever fires first wins. A grandchild that inherited
+    /// the pipe can't pin us either — output is collected incrementally,
+    /// never with a blocking read-to-EOF.
+    static func run(
         _ executable: URL,
         arguments: [String],
         timeout: TimeInterval,
@@ -134,40 +147,69 @@ enum ClaudeCLI {
         environment["TERM"] = "dumb"
         process.environment = environment
 
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-
         // Process and FileHandle predate Sendable; the box makes the
         // cross-queue capture explicit rather than implicit.
         let box = UncheckedBox((process: process, handle: pipe.fileHandleForReading))
+        let output = OutputBuffer()
         let resumed = AtomicFlag()
 
         return await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-            let resumeOnce: @Sendable (String?) -> Void = { value in
+            let finish: @Sendable (String?) -> Void = { value in
                 guard resumed.testAndSet() == false else { return }
+                box.value.handle.readabilityHandler = nil
+                try? box.value.handle.close()
                 continuation.resume(returning: value)
             }
 
-            // Watchdog, so a wedged CLI can never wedge Robut. No
-            // DispatchWorkItem to cancel — the `isRunning` check makes a
-            // late fire a no-op, and a cancellable item would be one more
-            // non-Sendable capture for nothing.
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                let running = box.value.process
-                if running.isRunning { running.terminate() }
+            box.value.handle.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if chunk.isEmpty { handle.readabilityHandler = nil } else { output.append(chunk) }
             }
 
-            DispatchQueue.global().async {
-                let data = box.value.handle.readDataToEndOfFile()
-                let running = box.value.process
-                running.waitUntilExit()
-                guard running.terminationStatus == 0 else { resumeOnce(nil); return }
-                resumeOnce(String(data: data, encoding: .utf8))
+            // Set BEFORE run(), or a fast exit can slip past it.
+            process.terminationHandler = { finished in
+                let succeeded = finished.terminationStatus == 0
+                // A beat for the last chunk to land before it's read.
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                    finish(succeeded ? output.string : nil)
+                }
+            }
+
+            // Watchdog: terminate, then kill, then resume regardless.
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if box.value.process.isRunning { box.value.process.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+                    if box.value.process.isRunning {
+                        kill(box.value.process.processIdentifier, SIGKILL)
+                    }
+                    finish(nil)
+                }
+            }
+
+            do {
+                try process.run()
+            } catch {
+                finish(nil)
             }
         }
+    }
+}
+
+/// Thread-safe stdout accumulator for the readability handler.
+private final class OutputBuffer: @unchecked Sendable {
+    private var data = Data()
+    private let lock = NSLock()
+
+    func append(_ chunk: Data) {
+        lock.lock()
+        data.append(chunk)
+        lock.unlock()
+    }
+
+    var string: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return String(data: data, encoding: .utf8)
     }
 }
 
@@ -180,8 +222,9 @@ private final class UncheckedBox<Value>: @unchecked Sendable {
 }
 
 /// Guarantees a continuation resumes exactly once — resuming twice is
-/// undefined behaviour, not a warning.
-private final class AtomicFlag: @unchecked Sendable {
+/// undefined behaviour, not a warning. Internal: AppModel's fetch budget
+/// races a fetch against a timer with the same rule.
+final class AtomicFlag: @unchecked Sendable {
     private var flag = false
     private let lock = NSLock()
 
