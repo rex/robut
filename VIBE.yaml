@@ -40,7 +40,8 @@ workflow:
   # continue-until-blocked = run autonomously until hitting a stop condition
   default_autonomy_mode: continue-until-blocked
   validation_command: make validate
-  final_verification_command: make check-if-the-agent-can-consider-this-task-completed
+  final_verification_command: make
+    check-if-the-agent-can-consider-this-task-completed
   # A signed+notarized macOS .app is the deliverable. Containers are not
   # applicable to this repo — never ask.
   ask_before_dockerizing: false
@@ -64,7 +65,7 @@ quality_gates:
       - RobutTests
     coverage:
       enabled: false
-      minimum_percentage: null
+      minimum_percentage:
   clean_worktree_required_on_completion: true
 
 architecture:
@@ -155,4 +156,8 @@ privacy:
 # Written at apply time by `make stamp-skill SKILL=<id>`; agentic-skeleton
 # stamps itself on `make sync-skeleton`. Verified advisorily by
 # `make check-skills`. Don't hand-edit entries — re-stamp instead.
-skills: []
+skills:
+  - id: agentic-skeleton
+    version: "0.48.0"
+    applied: '2026-09-05'
+    source: sync

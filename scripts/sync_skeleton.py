@@ -87,6 +87,9 @@ ADVISORY = {
 # never a heuristic — a repo-local file is never deleted by guesswork.
 RETIRED = (
     ".claude/hooks/pre-compact.sh",
+    ".claude/hooks/serena-gate.sh",
+    ".claude/hooks/serena-required.sh",
+    ".claude/rules/serena.md",
 )
 
 SKELETON_CANDIDATES = (

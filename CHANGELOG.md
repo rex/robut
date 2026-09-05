@@ -30,6 +30,16 @@ version bumps).
 
 ---
 
+## [0.24.0] — 2026-09-05 — Agent: Claude Fable 5.1
+### Changed
+- Synced skeleton-owned files to agentic-skeleton v0.48.0: gate scripts
+  (`check_architecture`, `check_module_rules`, `sync_skeleton`, new
+  `check_skills` / `stamp_skill`), session-start + stop-gate hooks, the
+  scaffold/retrofit/sync-skills commands, and the language rules; VIBE.yaml
+  provenance stamped. The advisory Makefile / pre-commit config were
+  reviewed by hand and left alone — the repo is a strict superset (privacy
+  gate in `validate`, privacy + swiftlint hooks), nothing to port.
+
 ## [0.23.0] — 2026-09-03 — Agent: Claude
 ### Removed
 - chore: Serena removed (retired 2026-09-03): .mcp.json entry, .serena/, rules/flags
