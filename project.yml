@@ -61,7 +61,7 @@ targets:
       # Liquid Glass icon (Icon Composer document). Same name as the
       # classic AppIcon set: macOS 26 renders this layered one, earlier
       # systems get the flat PNGs. Both are rendered by
-      # Scripts/render-app-icon.swift from the robot's pixel grid.
+      # scripts/render-app-icon.swift from the robot's pixel grid.
       - path: Robut/AppIcon.icon
         type: file
     dependencies:

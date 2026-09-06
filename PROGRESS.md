@@ -45,7 +45,7 @@ alarm-gated colour and the projection marker.
 - 2026-09-06 **The robot is the 16×16 antenna boxhead** (maintainer's
   pick; the 8×8 was an agent's shortcut). One grid drives the menubar,
   the pane, the flat icon catalog, AND a Liquid Glass `AppIcon.icon`
-  (two glass layers on a dark gradient) — `Scripts/render-app-icon.swift`
+  (two glass layers on a dark gradient) — `scripts/render-app-icon.swift`
   renders both; xcodegen types the document `wrapper.icon`.
 - 2026-09-05 **The loop must never await an unbounded fetch**: runner
   rebuilt around the termination handler; `AppModel.bounded` budgets

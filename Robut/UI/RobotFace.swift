@@ -72,7 +72,7 @@ enum RobotMood: Sendable, Hashable {
     /// anything else is transparent; the dark gaps are the eyes and mouth.
     ///
     /// ONE source for the menubar icon, the pane face, and the app icon
-    /// (`Scripts/render-app-icon.swift` copies the calm face — change it
+    /// (`scripts/render-app-icon.swift` copies the calm face — change it
     /// here, re-render there). Keep it 16 wide: `RobotIcon` floors the
     /// cell to whole points against an 18pt bar, so a LARGER grid draws a
     /// SMALLER robot.

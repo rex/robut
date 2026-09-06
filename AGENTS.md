@@ -69,7 +69,7 @@ reintroduces the exact bug this app exists to fix. See §9.
 project.yml       xcodegen manifest — SOURCE OF TRUTH for the Xcode project
 Local.xcconfig    signing identity (GITIGNORED — never commit)
 Config/           Signing.xcconfig (optional Local include) + ExportOptions template
-Scripts/          render-app-icon.swift — the icon, from the pixel robot's grid
+scripts/          skeleton gate scripts + render-app-icon.swift (the icon, from the robot's grid)
 Robut/            app sources
   App/            @main entry, app model, DI
   Core/
@@ -260,7 +260,7 @@ change gets a corresponding test update.
   18pt menubar (16 columns → 1pt cells → a 16pt glyph); a 24- or 32-wide
   grid would render at 0pt-rounded-to-1 or be clipped — bigger grid,
   smaller or broken robot. The pane face and the app icon copy the same
-  grid — `Scripts/render-app-icon.swift` renders BOTH the flat catalog
+  grid — `scripts/render-app-icon.swift` renders BOTH the flat catalog
   PNGs (macOS ≤15) and the Liquid Glass `Robut/AppIcon.icon` (SVG glass
   layers, macOS 26; same name so Xcode pairs them; xcodegen types it
   `wrapper.icon`). Change the face here, re-run the script, commit all

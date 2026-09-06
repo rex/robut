@@ -30,6 +30,17 @@ version bumps).
 
 ---
 
+## [0.28.0] — 2026-09-06 — Agent: Claude Fable 5.1
+### Fixed
+- **The icon renderer is now actually in the repo.** v0.27.0 referenced
+  `Scripts/render-app-icon.swift`, but the skeleton's gate scripts live in
+  lowercase `scripts/`, and on macOS's case-insensitive filesystem the
+  uppercase path silently resolved into that directory while `git add`
+  recorded nothing — a fresh clone could not have re-rendered the icon.
+  The script lives at `scripts/render-app-icon.swift`; every reference
+  (AGENTS §4/§9, project.yml, RobotFace, the script's own usage line)
+  says so.
+
 ## [0.27.0] — 2026-09-06 — Agent: Claude Fable 5.1
 ### Added
 - **The menubar robot is now the 16×16 "antenna boxhead"** — the
@@ -41,7 +52,7 @@ version bumps).
   needed no change — both size cells from the grid, so 16 columns render
   at 1pt cells in the same 16pt footprint. `RobotMoodGridTests` pins the
   16×16 shape (a short row would misrender silently).
-- **App icon, twice from the same grid** (`Scripts/render-app-icon.swift`):
+- **App icon, twice from the same grid** (`scripts/render-app-icon.swift`):
   the classic asset catalog (flat PNGs on the panel colour) for macOS 15
   and earlier, and a **Liquid Glass Icon Composer document**
   (`Robut/AppIcon.icon`: body and antenna as separate glass layers over a
