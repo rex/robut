@@ -39,16 +39,16 @@ BUILT and dry-run verified (`make export` → universal, Developer ID,
 hardened runtime, Sparkle embedded and validated) but NOT yet released:
 notarization needs the maintainer's one-time `make notary-init`. The
 refresh loop's 19-hour stall (a `waitUntilExit` race) and the "no token"
-latch after a keychain failure are fixed (v0.26.0). The 8×8 menubar
-robot is REJECTED by the maintainer; 16×16 candidates (scratch sheets
-"A antenna boxhead" / "B bolt-ears" with all four moods) await his pick
-— the app icon is parked until the glyph is settled. Claude Design is
-still designing the STATS DISPLAY (`docs/stats-matrix.md`).
+latch after a keychain failure are fixed (v0.26.0). The menubar robot
+is the 16×16 "antenna boxhead" (v0.27.0, the maintainer's pick) and the
+app icon ships twice from that one grid — a flat catalog for macOS ≤15
+and a Liquid Glass `Robut/AppIcon.icon` that macOS 26 renders natively.
+Claude Design is still designing the STATS DISPLAY (`docs/stats-matrix.md`).
 
 **Next planned work:** (1) maintainer runs `make notary-init`, then
-`make notarize && make release` for the first tagged release; (2) port
-the chosen 16×16 robot into `RobotMood.pixels` (+ `RobotIcon` scale) and
-render the app icon from it; (3) stats display once the design lands.
+`make notarize && make release` for the first tagged release; (2) stats
+display once the design lands; (3) re-sync the new robot into the design
+project when DesignSync is authorized interactively.
 
 **Read `AGENTS.md` §1 and §9 before touching anything.** This is a **public
 repo** — no personal data, ever (`make privacy`; a commit-msg gate scans
@@ -139,7 +139,9 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
   - [ ] `make release` → tag `v<VERSION>` + zip + appcast on GitHub.
   - [ ] Install from the zip on a clean account: opens without warning.
   - [ ] Cut a second release; the first install offers the update.
-  - [ ] App icon — parked on the 16×16 robot decision (§5 item 2).
+  - [x] App icon — flat catalog + Liquid Glass `AppIcon.icon`, both
+        rendered from the 16×16 grid (v0.27.0); actool compiles the
+        layered icon into `Assets.car` beside the `.icns` fallback.
 
 ## 3. Blockers / open questions
 
@@ -237,15 +239,11 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
    `spctl --assess --type execute build/release/export/Robut.app` says
    "Notarized Developer ID", then install the zip from the GitHub
    Release on a clean user account.
-2. **Menubar robot → 16×16.** The maintainer rejected the 8×8 glyph.
-   Candidate sheets (A "antenna boxhead" recommended, B "bolt-ears", all
-   four moods each) were rendered 2026-09-05 — awaiting his pick. Then:
-   port the four grids into `RobotMood.pixels`, make sure `RobotIcon`
-   renders a 16-column grid at menubar size, and render the app icon
-   from the new calm face (the asset catalog + `render-app-icon.swift`
-   from this session are parked in the session scratchpad; recreate from
-   the chosen grid). Re-sync the brand in the design project afterwards
-   (DesignSync needs an interactive `/design-login`).
+2. **Brand sync.** The 16×16 antenna boxhead shipped (v0.27.0); the
+   design project still carries the 8×8 (`components/brand/RobotFace.jsx`,
+   `guidelines/brand-robot-moods.html`, the marks). Push the new grids
+   and the icon renders there — DesignSync needs an interactive
+   `/design-login` first.
 3. **Stats display** — Claude Design has `docs/stats-matrix.md`; build
    only after their design lands (`model.stats.snapshot()` is flowing).
 4. CI (`macos-latest`: build + test + lint + privacy) — deferred until

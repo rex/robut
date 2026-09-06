@@ -30,6 +30,28 @@ version bumps).
 
 ---
 
+## [0.27.0] — 2026-09-06 — Agent: Claude Fable 5.1
+### Added
+- **The menubar robot is now the 16×16 "antenna boxhead"** — the
+  maintainer's pick from the 2026-09-05 candidate sheets, replacing the
+  rejected 8×8 glyph. Four moods share one anatomy (`RobotMood.pixels`
+  composes crown / eyes / brow / mouth / torso): calm has open eyes and a
+  grille, squint half-closed eyes and a flat mouth, alarmed wide eyes and
+  an open mouth, dim closed eyes and no mouth. `RobotIcon` and `RobotFace`
+  needed no change — both size cells from the grid, so 16 columns render
+  at 1pt cells in the same 16pt footprint. `RobotMoodGridTests` pins the
+  16×16 shape (a short row would misrender silently).
+- **App icon, twice from the same grid** (`Scripts/render-app-icon.swift`):
+  the classic asset catalog (flat PNGs on the panel colour) for macOS 15
+  and earlier, and a **Liquid Glass Icon Composer document**
+  (`Robut/AppIcon.icon`: body and antenna as separate glass layers over a
+  dark gradient, specular + per-layer shadow) that macOS 26 renders
+  natively. Same name, so Xcode pairs them. The document schema was taken
+  from real Icon Composer files on disk (Sparkle's and the maintainer's
+  own); xcodegen types the bundle `wrapper.icon`, and actool compiled it
+  into `Assets.car` as layered `IconGroup` vectors with Aqua / DarkAqua /
+  tintable appearances alongside the flat `AppIcon.icns`.
+
 ## [0.26.1] — 2026-09-05 — Agent: Claude Fable 5.1
 ### Changed
 - `TASK_STATE.md` (§0/§1/§2/§5/§6) and `PROGRESS.md` record the session:

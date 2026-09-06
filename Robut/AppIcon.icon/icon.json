@@ -1,0 +1,39 @@
+{
+  "fill-specializations" : [
+    { "value" : {
+      "linear-gradient" : [ "extended-srgb:0.10980,0.11765,0.13333,1.00000", "extended-srgb:0.03922,0.04314,0.05098,1.00000" ],
+      "orientation" : { "start" : { "x" : 0, "y" : 0 }, "stop" : { "x" : 1, "y" : 1 } }
+    } },
+    { "appearance" : "dark", "value" : {
+      "linear-gradient" : [ "extended-srgb:0.10980,0.11765,0.13333,1.00000", "extended-srgb:0.03922,0.04314,0.05098,1.00000" ],
+      "orientation" : { "start" : { "x" : 0, "y" : 0 }, "stop" : { "x" : 1, "y" : 1 } }
+    } }
+  ],
+  "groups" : [
+    {
+      "blend-mode" : "normal",
+      "blur-material" : null,
+      "hidden" : false,
+      "layers" : [
+        { "glass" : true, "hidden" : false, "image-name" : "01-body.svg", "name" : "01-body" }
+      ],
+      "lighting" : "individual",
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "specular" : true,
+      "translucency" : { "enabled" : true, "value" : 0.35 }
+    },
+    {
+      "blend-mode" : "normal",
+      "blur-material" : null,
+      "hidden" : false,
+      "layers" : [
+        { "glass" : true, "hidden" : false, "image-name" : "02-antenna.svg", "name" : "02-antenna" }
+      ],
+      "lighting" : "individual",
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "specular" : true,
+      "translucency" : { "enabled" : false, "value" : 0.5 }
+    }
+  ],
+  "supported-platforms" : { "circles" : [ "watchOS" ], "squares" : "shared" }
+}

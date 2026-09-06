@@ -255,6 +255,17 @@ change gets a corresponding test update.
   different axes, same reading, because in both the gap to the right edge
   is your margin. Don't re-add tinted per-row prose; the tooltip carries
   the precise sentence.
+- **The robot is a 16×16 grid in `RobotMood.pixels`, and 16 is not a
+  suggestion.** `RobotIcon` floors the cell to whole points against an
+  18pt menubar (16 columns → 1pt cells → a 16pt glyph); a 24- or 32-wide
+  grid would render at 0pt-rounded-to-1 or be clipped — bigger grid,
+  smaller or broken robot. The pane face and the app icon copy the same
+  grid — `Scripts/render-app-icon.swift` renders BOTH the flat catalog
+  PNGs (macOS ≤15) and the Liquid Glass `Robut/AppIcon.icon` (SVG glass
+  layers, macOS 26; same name so Xcode pairs them; xcodegen types it
+  `wrapper.icon`). Change the face here, re-run the script, commit all
+  outputs. The 8×8 original was an agent's shortcut, rejected by the
+  maintainer.
 - **Status colours have ONE source of truth: `RobotMood.nsTint`**
   (`RobotFace.swift`). The design tokens mirror it and `Theme.status(_:)`
   surfaces it — so the menubar icon and the pane can't drift. NEVER retune a

@@ -68,46 +68,59 @@ enum RobotMood: Sendable, Hashable {
         }
     }
 
-    /// 8×8 pixel grid. `#` draws, anything else is transparent — the gaps
-    /// are what form the eyes and mouth, exactly like the logo.
+    /// 16×16 pixel grid — the "antenna boxhead" (2026-09-06). `#` draws,
+    /// anything else is transparent; the dark gaps are the eyes and mouth.
+    ///
+    /// ONE source for the menubar icon, the pane face, and the app icon
+    /// (`Scripts/render-app-icon.swift` copies the calm face — change it
+    /// here, re-render there). Keep it 16 wide: `RobotIcon` floors the
+    /// cell to whole points against an 18pt bar, so a LARGER grid draws a
+    /// SMALLER robot.
     var pixels: [String] {
-        switch self {
-        case .calm:
-            ["   ##   ",
-             "   ##   ",
-             " ###### ",
-             "########",
-             "## ## ##",
-             "########",
-             "#  ##  #",
-             " ###### "]
-        case .squint:
-            ["   ##   ",
-             "   ##   ",
-             " ###### ",
-             "########",
-             "########",
-             "## ## ##",
-             "#      #",
-             " ###### "]
-        case .alarmed:
-            ["   ##   ",
-             "   ##   ",
-             " ###### ",
-             "########",
-             "# #  # #",
-             "########",
-             "#  ##  #",
-             " #    # "]
-        case .dim:
-            ["   ##   ",
-             "   ##   ",
-             " ###### ",
-             "########",
-             "## ## ##",
-             "########",
-             "########",
-             " ###### "]
+        Self.crown + eyes + Self.brow + mouth + Self.torso
+    }
+
+    // Shared anatomy, top to bottom. 4 + 3 + 2 + 2 + 5 = 16 rows.
+    private static let crown = [
+        ".......##.......",   // antenna tip
+        ".......##.......",   // antenna stem
+        "..############..",
+        ".##############.",
+    ]
+    private static let brow = [
+        ".##############.",
+        ".##############.",
+    ]
+    private static let torso = [
+        "..############..",
+        "......####......",   // neck
+        "...##########...",   // shoulders
+        "..############..",
+        "................",
+    ]
+
+    /// Three rows. The eyes are dark 2-wide holes at columns 3–4 / 11–12;
+    /// how many rows they occupy is the expression.
+    private var eyes: [String] {
+        let open = ".##..######..##."
+        let solid = ".##############."
+        return switch self {
+        case .calm: [solid, open, open]
+        case .squint, .dim: [solid, solid, open]   // half-closed / closed
+        case .alarmed: [open, open, open]           // wide
+        }
+    }
+
+    /// Two rows under the brow.
+    private var mouth: [String] {
+        let solid = ".##############."
+        let grille = ".##.#.#..#.#.##."
+        let flat = ".####......####."
+        return switch self {
+        case .calm: [grille, solid]
+        case .squint: [flat, solid]
+        case .alarmed: [flat, flat]                 // open
+        case .dim: [solid, solid]                   // closed
         }
     }
 }

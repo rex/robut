@@ -6,8 +6,8 @@
 - **Project**: Robut — macOS menubar AI-usage tracker (Swift 6 / SwiftUI /
   xcodegen). Shows Claude + Codex usage with burn-rate projection.
 - **Active branch**: `main`
-- **Version**: v0.26.x — release pipeline built + Sparkle; loop-stall
-  fixed; all gates green.
+- **Version**: v0.27.0 — release pipeline + Sparkle; loop-stall fixed;
+  16×16 robot + Liquid Glass icon; all gates green.
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
 - **Last session**: 2026-09-05 (Claude Fable 5.1). Skeleton sync; Slice
   5.1 (Developer ID export, notarization + Sparkle targets, appcast as
@@ -41,8 +41,12 @@ alarm-gated colour and the projection marker.
   (feed `releases/latest/download/appcast.xml`); `make notarize` then
   `make release`; every release signed with the same Developer ID;
   `archive` refuses ad-hoc, `package` refuses un-stapled, `appcast`
-  refuses unsigned. App icon parked: the maintainer rejected the 8×8
-  robot; 16×16 replacement pending his pick.
+  refuses unsigned.
+- 2026-09-06 **The robot is the 16×16 antenna boxhead** (maintainer's
+  pick; the 8×8 was an agent's shortcut). One grid drives the menubar,
+  the pane, the flat icon catalog, AND a Liquid Glass `AppIcon.icon`
+  (two glass layers on a dark gradient) — `Scripts/render-app-icon.swift`
+  renders both; xcodegen types the document `wrapper.icon`.
 - 2026-09-05 **The loop must never await an unbounded fetch**: runner
   rebuilt around the termination handler; `AppModel.bounded` budgets
   every fetch; keychain read failures retry instead of latching.
