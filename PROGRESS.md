@@ -6,14 +6,14 @@
 - **Project**: Robut — macOS menubar AI-usage tracker (Swift 6 / SwiftUI /
   xcodegen). Shows Claude + Codex usage with burn-rate projection.
 - **Active branch**: `main`
-- **Version**: v0.27.0 — release pipeline + Sparkle; loop-stall fixed;
-  16×16 robot + Liquid Glass icon; all gates green.
+- **Version**: v0.31.1 — first public release notarized and staged,
+  unpublished pending #9's sign-in check; all gates green (159 tests).
+- **Work tracking**: Rivendell — `rivendell_list(repo="rex/robut")`.
 - **Active TASK_STATE**: `TASK_STATE.md` — read §0 then §5 (next).
-- **Last session**: 2026-09-05 (Claude Fable 5.1). Skeleton sync; Slice
-  5.1 (Developer ID export, notarization + Sparkle targets, appcast as
-  a release asset) dry-run verified up to the notary gate; diagnosed and
-  fixed the 19h refresh-loop stall + the keychain "no token" latch;
-  16×16 robot candidates rendered for the maintainer's pick.
+- **Last session**: 2026-10-18 (Claude Opus 5.5). Sitrep after a six-week
+  outage (reboot; not a login item). Fixed the console-flow sign-in (#9),
+  restored eight deleted Makefile gates + `check-phony` (#1), added launch
+  at login (#2), notarized the first release (#3).
 
 ## Current state (one line)
 
@@ -37,6 +37,11 @@ alarm-gated colour and the projection marker.
 - 2026-07-23 Integrated the Robut Design System (claude.ai design project):
   a Swift `Theme` (status colours sourced from `RobotMood.nsTint`), self-hosted
   Geist/Geist Mono, and a full pane rebuild + the pace marker. v0.16.0.
+- 2026-10-18 **Sign in through the claude.ai flow, never the console's**
+  (#9): a console-flow token reads "OAuth authentication is currently not
+  allowed for this organization." **Launch at login** (#2): Release-only,
+  first launch, once, never against the user. **No scripted rewrites of
+  tracked files**: one deleted eight Makefile gates; `check-phony` guards.
 - 2026-09-05 **Release = zip + Sparkle appcast as GitHub Release assets**
   (feed `releases/latest/download/appcast.xml`); `make notarize` then
   `make release`; every release signed with the same Developer ID;

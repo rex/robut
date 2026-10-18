@@ -30,6 +30,31 @@ version bumps).
 
 ---
 
+## [0.31.1] — 2026-10-18 — Agent: Claude Opus 5.5
+### First public release
+
+Robut is a macOS menubar app that shows your Claude and Codex usage at a
+glance — and answers the question nothing else does: **at the pace you're
+going, will it last until the reset?**
+
+- **One glance.** The robot's colour is the answer: green, you'll make it;
+  gold, worth a look; red, you'll actually be blocked. Colour tracks
+  consequence, not raw percentages — a spent five-hour session refills on
+  its own and never turns the robot red.
+- **Every window.** Session, weekly, and model-specific weeklies, each with
+  a meter, the time to reset, and a marker for where your current pace
+  lands.
+- **Claude:** sign in once from the pane, through claude.ai. Robut keeps
+  its own token in its own keychain item and never reads Claude Code's —
+  so no keychain password prompts, ever.
+- **Codex:** read straight from `~/.codex/sessions`. Nothing to set up.
+- **Stays out of the way.** Opens at login, updates itself (every update
+  is EdDSA-signed and Developer ID-signed), and keeps everything on your
+  Mac — no Robut account, no server, no telemetry.
+
+Requires macOS 14 or later; universal (Apple silicon and Intel). Download
+the zip below, open it, and drag Robut to Applications.
+
 ## [0.31.0] — 2026-10-18 — Agent: Claude Opus 5.5
 ### Added
 - **Launch at login** (rex/robut#2). The Mac rebooted at 06:14 on

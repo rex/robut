@@ -5,7 +5,7 @@
 > and context compactions.
 >
 > Spec: `specs/<slug>/spec.md` · Plan: `specs/<slug>/plan.md`
-> Branch: `main` · Owner: repo maintainer · Last update: 2026-09-05 by Claude Fable 5.1
+> Branch: `main` · Owner: repo maintainer · Last update: 2026-10-18 by Claude Opus 5.5
 
 ## 0. TL;DR for a fresh agent session
 
@@ -34,21 +34,22 @@ estimates, all local + read-only, read via `model.stats.snapshot()`.
   severity is alarm-gated (`PaceEngine+Alarm`, v0.19) — outlook is fact,
   alarm is consequence; colour follows the alarm.
 
-**Current context (2026-09-05):** Slice 5.1 — the release pipeline — is
-BUILT and dry-run verified (`make export` → universal, Developer ID,
-hardened runtime, Sparkle embedded and validated) but NOT yet released:
-notarization needs the maintainer's one-time `make notary-init`. The
-refresh loop's 19-hour stall (a `waitUntilExit` race) and the "no token"
-latch after a keychain failure are fixed (v0.26.0). The menubar robot
-is the 16×16 "antenna boxhead" (v0.27.0, the maintainer's pick) and the
-app icon ships twice from that one grid — a flat catalog for macOS ≤15
-and a Liquid Glass `Robut/AppIcon.icon` that macOS 26 renders natively.
-Claude Design is still designing the STATS DISPLAY (`docs/stats-matrix.md`).
+**Current context (2026-10-18):** work is tracked in **Rivendell**
+(rex/robut issues; `rivendell_list(repo="rex/robut")`), not here. Robut
+was dead Sep 6 → Oct 18 (a reboot; it wasn't a login item — fixed, #2).
+The first public release (#3) is notarized and staged but NOT published:
+it waits on #9 — the sign-in used the console authorize flow, and the
+server refuses that token ("OAuth authentication is currently not allowed
+for this organization"); v0.29.0 switched to the claude.ai flow and needs
+one fresh sign-in to prove it. The Makefile gates deleted in v0.25.0 are
+restored with a `check-phony` guard (#1). The menubar robot is the 16×16
+"antenna boxhead"; the icon ships flat + Liquid Glass from one grid.
 
-**Next planned work:** (1) maintainer runs `make notary-init`, then
-`make notarize && make release` for the first tagged release; (2) stats
-display once the design lands; (3) re-sync the new robot into the design
-project when DesignSync is authorized interactively.
+**Next planned work:** (1) maintainer signs in again from the pane →
+confirm float Claude samples → close #9; (2) `make release` (the stapled
+v0.31.1 build in `build/release/`; one Keychain "Always Allow" for the
+Sparkle key) → close #3; (3) the Inbox: #4–#8, #10. Stats display (#6)
+still waits on the design and an interactive `/design-login`.
 
 **Read `AGENTS.md` §1 and §9 before touching anything.** This is a **public
 repo** — no personal data, ever (`make privacy`; a commit-msg gate scans
@@ -230,40 +231,55 @@ Statuses: `⏸ pending` · `🟡 in-prog` · `✅ done` · `🔴 blocked`
 
 ## 5. Next actions (ordered)
 
-1. **First release (maintainer).** `make notary-init` once — it asks
-   for your Apple ID email and an APP-SPECIFIC PASSWORD (account.apple.com
-   → Sign-In and Security → App-Specific Passwords); the Team ID comes
-   from `Local.xcconfig`. Then `make notarize && make release`. The
-   first `make release` in a terminal asks Keychain to let
-   `generate_appcast` read the Sparkle key — click Always Allow. Verify
-   `spctl --assess --type execute build/release/export/Robut.app` says
-   "Notarized Developer ID", then install the zip from the GitHub
-   Release on a clean user account.
-2. **Brand sync.** The 16×16 antenna boxhead shipped (v0.27.0); the
-   design project still carries the 8×8 (`components/brand/RobotFace.jsx`,
-   `guidelines/brand-robot-moods.html`, the marks). Push the new grids
-   and the icon renders there — DesignSync needs an interactive
-   `/design-login` first.
-3. **Stats display** — Claude Design has `docs/stats-matrix.md`; build
-   only after their design lands (`model.stats.snapshot()` is flowing).
-4. CI (`macos-latest`: build + test + lint + privacy) — deferred until
-   requested; the release targets are manual by design.
-5. Watch the long-horizon verdicts over real weeks (§3). With 2-minute
-   API sampling restored, prior-epoch learning finally has clean input;
-   re-tune `PaceEngine+Alarm` / `+LongHorizon` only against replayed
-   history.
+The work list lives in Rivendell (rex/robut) — this section only orders
+it. `rivendell_list(repo="rex/robut")` is the source of truth.
 
-## 6. Handoff note (2026-09-05, v0.26.x)
+1. **#9 — verify the claude.ai sign-in.** Maintainer: pane footer →
+   "Claude · sign in again" → the browser now opens claude.com (not
+   platform.claude.com) → paste the code. Then confirm float samples in
+   `~/Library/Application Support/Robut/usage-history.jsonl` and no
+   "auth rejected" in the `com.robut.app` log. Close #9 in that commit.
+2. **#3 — publish.** `build/release/` holds the notarized, stapled
+   v0.31.1. `make release` packages, writes the EdDSA-signed appcast
+   (first run: Keychain asks to let `generate_appcast` read the Sparkle
+   key — Always Allow), tags `v0.31.1`, and creates the GitHub Release.
+   No commits between notarize and release, or the tag and the app's
+   version disagree. Then install from the zip and cut a second release
+   to prove Sparkle offers it.
+3. Inbox, roughly in order: #10 (`make start` race), #4 (prompts series),
+   #5 (pricing hygiene), #8 (duplicate relaunch sample), #7 (design sync
+   — needs `/design-login`), #6 (stats display — needs the design).
+4. CI stays deferred until requested.
 
-**State:** working tree clean, all pushed, all gates green (lint,
-typecheck, privacy, architecture, module-rules, version-gate; test suite
-"Test Succeeded" — the xcpretty summary no longer prints a count).
+## 6. Handoff note (2026-10-18, v0.31.x)
 
-**Shipped this session:** skeleton sync to v0.48.0 (v0.24.0); the release
-pipeline + Sparkle (v0.25.0, `c89f469`); the refresh-loop resilience
-fix (v0.26.0, `47ac34c`).
+**State:** working tree clean, all pushed, the restored completion gate
+(`make check-if-the-agent-can-consider-this-task-completed`) green on
+Xcode 27.1 / macOS 26.6 — 159 tests / 35 suites. `make test FMT=` shows
+the Swift Testing counts that xcpretty hides.
 
-**Load-bearing facts for whoever picks this up:**
+**This session (2026-10-18):** sitrep found Robut dead since the Sep 6
+reboot, both Claude paths signed out, the release never run, and eight
+Makefile gates deleted by v0.25.0's scripted rewrite. Shipped: #9 fix
+(v0.29.0, `839505d` — claude.ai authorize flow, 403 split, error message
+logged), #1 (v0.30.0, `557ce1e` — gates restored, `check-phony`, skeleton
+v0.50.0, gitleaks; full-history scan clean), #2 (v0.31.0, `cdff450` —
+launch at login), first-release notes (v0.31.1), notarization verified.
+
+**Load-bearing facts from this session:**
+- The usage endpoint refuses console-flow tokens: "OAuth authentication
+  is currently not allowed for this organization." Claude Code 2.1.299
+  has `CONSOLE_AUTHORIZE_URL` and `CLAUDE_AI_AUTHORIZE_URL`; subscription
+  usage needs the latter. Its `Gl()` treats a 403 WITH an Anthropic error
+  envelope as auth-rejected and a bare 403 as throttling — Robut matches.
+- Never rewrite a tracked file with a script (maintainer rule): the
+  v0.25.0 Python rewrite of the Makefile is what silently deleted eight
+  gates. `check-phony` now fails if a `.PHONY` name loses its rule.
+- `sync_skeleton.py`'s VIBE.yaml provenance stamp leaves a trailing space
+  that the trailing-whitespace hook trims on every sync — re-stage and
+  commit again; it is not a real failure.
+
+**Load-bearing facts from 2026-09-05:**
 - `make notarize` = archive → export → notarize → staple into
   `build/release/`; `make release` = package → appcast → tag →
   `gh release create`. Guards: `archive` refuses without a Team ID in
@@ -282,11 +298,5 @@ fix (v0.26.0, `47ac34c`).
   the child's exit). Runner rebuilt on the termination handler;
   `AppModel.bounded` budgets every fetch (4 min); `RobutKeychain.read`
   throws on failure and the manager retries instead of latching.
-- The running app before this session had been on CLI fallback since
-  09-01 (keychain read failed at a launchd-outage launch; last token
-  rotation 08-26). After relaunch the manager retries the keychain; if
-  the Aug-26 refresh token is dead the footer reads "Claude · sign in
-  again" and the maintainer reconnects via the pane.
-- Icon: NOT shipped. Any icon must come from the new 16×16 glyph.
 
 Older handoffs live in git history; §4 + CHANGELOG carry the facts.
