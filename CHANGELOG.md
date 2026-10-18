@@ -30,6 +30,28 @@ version bumps).
 
 ---
 
+## [0.29.0] — 2026-10-18 — Agent: Claude Opus 5.5
+### Fixed
+- **Sign-in minted a token the usage endpoint refuses** (rex/robut#9). The
+  maintainer's fresh sign-in got `HTTP 403 permission_error` on its first
+  usage read. Diagnosed offline from Claude Code 2.1.299: it now has two
+  authorize URLs — `CONSOLE_AUTHORIZE_URL` (platform.claude.com) and
+  `CLAUDE_AI_AUTHORIZE_URL` (claude.com/cai) — and picks the latter for
+  subscription logins. Robut still used the console one, which binds the
+  token to a console organization; subscription usage refuses it. Robut
+  now authorizes through the claude.ai flow. Scopes, client id, token URL,
+  and the manual redirect are unchanged (the client-side gate still asks
+  for exactly `user:inference` + `user:profile`).
+- A 403 **without** an Anthropic error envelope is now a back-off
+  (Retry-After, five minutes by default) instead of "sign in again" —
+  Claude Code files that shape with 429 as throttling. A 403 *with* an
+  envelope still latches `.userAction`.
+
+### Changed
+- An auth rejection logs the error envelope's `message` (truncated, local
+  log only) next to its `type`, so the next refusal is diagnosable without
+  digging through a binary.
+
 ## [0.28.0] — 2026-09-06 — Agent: Claude Fable 5.1
 ### Fixed
 - **The icon renderer is now actually in the repo.** v0.27.0 referenced

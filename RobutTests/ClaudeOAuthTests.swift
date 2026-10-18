@@ -51,7 +51,10 @@ struct ClaudeAuthorizeURLTests {
             uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") }
         )
 
-        #expect(url.absoluteString.hasPrefix("https://platform.claude.com/oauth/authorize"))
+        // The claude.ai SUBSCRIPTION flow, never the console one: a console
+        // token reads subscription usage as 403 permission_error (#9).
+        #expect(url.absoluteString.hasPrefix("https://claude.com/cai/oauth/authorize"))
+        #expect(!url.absoluteString.contains("platform.claude.com/oauth/authorize"))
         #expect(items["client_id"] == ClaudeOAuth.clientID)
         #expect(items["response_type"] == "code")
         #expect(items["code_challenge_method"] == "S256")

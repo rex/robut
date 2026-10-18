@@ -85,11 +85,31 @@ struct ClaudeAPIUsageSource: UsageSource {
         case 200:
             return decode(data, now: now)
 
+        case 403 where apiError(data) == nil:
+            // A 403 with no Anthropic error envelope is the edge refusing
+            // the request — throttling, not a verdict on the token. Claude
+            // Code treats it exactly so (`Gl()` vs its `rate_limited` path):
+            // back off for Retry-After, five minutes by default, an hour at
+            // most. Demanding a sign-in here would be a lie the user can't
+            // act on.
+            let pause = retryAfter(http) ?? 5 * 60
+            let seconds = Int(pause)
+            Log.providers.notice("claude usage 403 without envelope; pausing \(seconds, privacy: .public)s")
+            return .failed(
+                reason: "Anthropic is throttling usage reads — paused for \(Int(pause / 60))m",
+                retry: .after(pause)
+            )
+
         case 401, 403:
             // The manager already refreshed a valid-scope token, so this
             // means re-auth. NEVER auto-retry a rejected credential.
-            let detail = apiErrorType(data).map { " (\($0))" } ?? ""
-            let summary = "HTTP \(status)\(detail)"
+            let error = apiError(data)
+            let detail = error?.type.map { " (\($0))" } ?? ""
+            // The message is the only clue to WHY a token was refused (rex/
+            // robut#9 needed a binary dig to learn it was the console flow).
+            // Server text, local log only, truncated.
+            let message = String((error?.message ?? "").prefix(160))
+            let summary = "HTTP \(status)\(detail) \(message)"
             Log.providers.notice("claude usage auth rejected: \(summary, privacy: .public)")
             return .failed(reason: "Sign in again\(detail)", retry: .userAction)
 
@@ -107,15 +127,18 @@ struct ClaudeAPIUsageSource: UsageSource {
         }
     }
 
-    /// Anthropic errors are `{"error":{"type":…,"message":…}}`. The type
-    /// is API metadata and safe to surface; the message can be verbose,
-    /// so only the type is used.
-    private func apiErrorType(_ data: Data) -> String? {
-        struct Envelope: Decodable {
-            struct APIError: Decodable { let type: String? }
-            let error: APIError?
-        }
-        return try? JSONDecoder().decode(Envelope.self, from: data).error?.type
+    /// Anthropic errors are `{"error":{"type":…,"message":…}}`. nil when
+    /// the body isn't that envelope — which is itself the signal that a 403
+    /// came from the edge, not from the API. The type is safe to surface in
+    /// the UI; the message goes to the local log only.
+    private struct APIError: Decodable {
+        let type: String?
+        let message: String?
+    }
+
+    private func apiError(_ data: Data) -> APIError? {
+        struct Envelope: Decodable { let error: APIError? }
+        return try? JSONDecoder().decode(Envelope.self, from: data).error
     }
 
     private func retryAfter(_ response: HTTPURLResponse) -> TimeInterval? {

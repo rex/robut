@@ -108,6 +108,36 @@ struct ClaudeAPIUsageSourceTests {
         }
     }
 
+    @Test("403 WITH an Anthropic error envelope is a rejected token: userAction")
+    func enveloped403IsUserAction() async {
+        // The live failure of rex/robut#9: a console-bound token, refused.
+        let state = await source(
+            json: #"{"error":{"type":"permission_error","message":"synthetic"}}"#, status: 403
+        ).fetch(now: t0)
+        guard case .failed(_, .userAction) = state else {
+            Issue.record("expected .failed(.userAction), got \(state)")
+            return
+        }
+    }
+
+    @Test("403 WITHOUT an envelope is the edge throttling: back off, don't demand sign-in")
+    func bare403BacksOff() async {
+        // Claude Code files a body-less 403 with 429 (rate_limited).
+        let bare = await source(json: "<html>Forbidden</html>", status: 403).fetch(now: t0)
+        guard case .failed(_, .after(let pause)) = bare else {
+            Issue.record("expected .failed(.after), got \(bare)")
+            return
+        }
+        #expect(pause == 5 * 60)
+
+        let hinted = await source(json: "", status: 403, headers: ["Retry-After": "900"]).fetch(now: t0)
+        guard case .failed(_, .after(let hintedPause)) = hinted else {
+            Issue.record("expected .failed(.after), got \(hinted)")
+            return
+        }
+        #expect(hintedPause == 900)
+    }
+
     @Test("429 honors Retry-After, clamped to sane bounds")
     func rateLimitHonorsRetryAfter() async {
         let state = await source(

@@ -17,8 +17,9 @@
 // invented. The client id is a PUBLIC PKCE client identifier (public
 // clients have no secret by design); it is not a credential.
 //
-// NOTE ON ENDPOINTS: sign-in and token exchange hit platform.claude.com,
-// which is NOT the rate-limited api.anthropic.com/api/oauth/usage. The
+// NOTE ON ENDPOINTS: the browser authorizes at claude.com (the claude.ai
+// subscription flow) and the token exchange hits platform.claude.com —
+// neither is the rate-limited api.anthropic.com/api/oauth/usage, so the
 // login flow cannot trigger the usage rate limit.
 
 import CryptoKit
@@ -68,7 +69,13 @@ enum ClaudeOAuth {
     /// Claude Code and used by the wider usage-tool ecosystem.
     static let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 
-    static let authorizeURL = "https://platform.claude.com/oauth/authorize"
+    /// Claude.ai SUBSCRIPTION login — `CLAUDE_AI_AUTHORIZE_URL` in Claude
+    /// Code, which picks it when `loginWithClaudeAi` is set. NOT the console
+    /// URL (`platform.claude.com/oauth/authorize`): that binds the token to a
+    /// console organization, and `/api/oauth/usage` — subscription usage —
+    /// answers such a token 403 `permission_error` (2026-10-18, rex/robut#9).
+    /// In July one URL served both; Claude Code 2.1.299 splits them.
+    static let authorizeURL = "https://claude.com/cai/oauth/authorize"
     static let tokenURL = "https://platform.claude.com/v1/oauth/token"
     /// The manual-display redirect: the browser shows the code for the
     /// user to copy, so Robut needs no loopback server.
