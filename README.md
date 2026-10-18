@@ -66,7 +66,9 @@ everything-client for every AI provider. That restraint is the point.
 2. Double-click the zip — macOS unpacks it into `Robut.app` right next to it.
 3. Drag `Robut.app` to `/Applications` and open it. It is signed with a
    Developer ID and notarized by Apple, so it opens without any Gatekeeper
-   warning; the robot appears in your menubar.
+   warning; the robot appears in your menubar. On that first launch Robut
+   adds itself to Login Items (macOS shows a notification) so it survives a
+   reboot — untick **Open at login** in the pane and it stays off.
 4. Click **Connect Claude** in the pane for live, float-resolution usage.
    Robut signs in with its own token and never reads Claude Code's
    credentials. Codex needs nothing — it is read from `~/.codex/sessions`.

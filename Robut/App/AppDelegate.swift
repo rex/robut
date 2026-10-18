@@ -57,7 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
         )
         updater = controller
-        MainActor.assumeIsolated { AppUpdates.controller = controller }
+        MainActor.assumeIsolated {
+            AppUpdates.controller = controller
+            // After the XCTest guard on purpose — see LaunchAtLogin.
+            LaunchAtLogin.shared.bootstrap()
+        }
     }
 
     /// Refresh immediately when the Mac wakes. Usage is hours stale after

@@ -86,6 +86,43 @@ struct UsagePane: View {
     }
 
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            loginRow
+            footerActions
+        }
+    }
+
+    /// Launch at login (rex/robut#2). Functional, not styled — the pane's
+    /// look belongs to the design system.
+    private var loginRow: some View {
+        let launch = LaunchAtLogin.shared
+        return HStack(spacing: 8) {
+            Toggle("Open at login", isOn: Binding(
+                get: { launch.isEnabled },
+                set: { launch.set(enabled: $0) }
+            ))
+            .toggleStyle(.checkbox)
+            .font(RobutFont.ui(10))
+            .foregroundStyle(Theme.Colors.textSecondary)
+
+            if launch.needsApproval {
+                Button("Approve in System Settings") { launch.openSystemSettings() }
+                .buttonStyle(.link)
+                .font(RobutFont.ui(10))
+            } else if let error = launch.lastError {
+                Text(error)
+                    .font(RobutFont.ui(10))
+                    .foregroundStyle(Theme.Colors.textTertiary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.Metrics.padX)
+        .padding(.top, Theme.Metrics.footerPad)
+        // The user can flip it in System Settings while Robut runs.
+        .onAppear { launch.refresh() }
+    }
+
+    private var footerActions: some View {
         HStack(spacing: 10) {
             // retryNow, not refresh: an explicit click is the user action
             // that clears a back-off.

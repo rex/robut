@@ -158,6 +158,14 @@ change gets a corresponding test update.
   test` the app is only the test host. Don't hoist it into `init` or the
   app struct — same class of bug as the startup network calls in §9's
   first bullet.
+- **Launch at login: first launch, Release only, once, never against the
+  user** (`LaunchAtLogin`, rex/robut#2). Robut wasn't a login item and
+  stayed dead for six weeks after one reboot. `bootstrap()` registers
+  `SMAppService.mainApp` on a Release build's first non-translocated
+  launch and records that it did; after that only the user's toggle (pane
+  or System Settings) decides. Debug builds never self-register — a
+  DerivedData copy and an installed copy must not both launch. Called after
+  the XCTest guard, like the updater.
 - **xcpretty needs a UTF-8 locale.** The Makefile exports `LC_ALL`; a
   C/POSIX locale (headless shells) crashes it on non-ASCII build output
   and the pipe reports a failed build that actually succeeded.

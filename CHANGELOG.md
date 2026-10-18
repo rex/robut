@@ -30,6 +30,21 @@ version bumps).
 
 ---
 
+## [0.31.0] — 2026-10-18 — Agent: Claude Opus 5.5
+### Added
+- **Launch at login** (rex/robut#2). The Mac rebooted at 06:14 on
+  2026-09-06; Robut wasn't a login item, so it stayed dead — no crash, no
+  log — for six weeks, and the history the pace engine learns from went
+  with it. `LaunchAtLogin` registers `SMAppService.mainApp` on a Release
+  build's first launch, once, and never against the user's choice after
+  that. It waits out App Translocation (a launch straight from Downloads
+  would register a path that vanishes) and never self-registers a Debug
+  build, so a DerivedData copy and an installed copy can't both start at
+  login. An **Open at login** checkbox in the pane flips it; when macOS
+  wants approval, the pane links to System Settings. Runs after the XCTest
+  guard, like the updater. `LaunchAtLoginTests` pins the policy against a
+  fake service (159 tests / 35 suites).
+
 ## [0.30.0] — 2026-10-18 — Agent: Claude Opus 5.5
 ### Fixed
 - **Eight Makefile gates were silently gone for six weeks** (rex/robut#1).
