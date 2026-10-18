@@ -30,6 +30,35 @@ version bumps).
 
 ---
 
+## [0.30.0] — 2026-10-18 — Agent: Claude Opus 5.5
+### Fixed
+- **Eight Makefile gates were silently gone for six weeks** (rex/robut#1).
+  v0.25.0 stripped retired Serena targets with a scripted rewrite whose
+  match also hit the Serena *section comment*, then skipped every line to
+  the next `@echo ""` — deleting `check-docs`, `check-precommit`,
+  `check-skeleton`, `sync-skeleton`, `check-skills`, `stamp-skill`,
+  `help-stack`, and the completion gate
+  `check-if-the-agent-can-consider-this-task-completed`. Their names stayed
+  in `.PHONY`, so make ran them as successful no-ops: the completion gate
+  exited 0 having checked nothing, and `validate` skipped `check-skills`.
+  The deletion also stranded `help-stack`'s body under `info`. All eight
+  restored verbatim from `c89f469^` with targeted edits.
+
+### Added
+- **`check-phony`** (in `validate`): fails when any `.PHONY` name has no
+  rule, so a deleted gate fails loudly instead of passing silently. The
+  never-defined template names (`run`, `db-*`) left `.PHONY`.
+- **gitleaks** pre-commit hook + `.gitleaks.toml`, ported from
+  agentic-skeleton v0.50.0 alongside the existing detect-secrets and
+  privacy gates. A full-history scan of the public repo (46 commits)
+  found no leaks.
+
+### Changed
+- Skeleton-owned files synced to agentic-skeleton v0.50.0
+  (`scripts/sync_skeleton.py`). The advisory Makefile and pre-commit
+  config were reconciled by hand: the skeleton has no target this repo
+  lacks, and both files are now strict supersets of the skeleton's.
+
 ## [0.29.0] — 2026-10-18 — Agent: Claude Opus 5.5
 ### Fixed
 - **Sign-in minted a token the usage endpoint refuses** (rex/robut#9). The

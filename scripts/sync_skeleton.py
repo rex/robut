@@ -60,7 +60,7 @@ _X = "\033[0m" if _TTY else ""
 VERBATIM_SCRIPTS = (
     "check_architecture.py", "check_module_rules.py", "check_docs.py",
     "check_version_bumped.py", "bump_version.py", "sync_skeleton.py",
-    "stamp_skill.py", "check_skills.py",
+    "stamp_skill.py", "check_skills.py", "secret_filters.py",
 )
 
 # Verbatim .claude/ directories: every file the skeleton ships in each
@@ -79,6 +79,7 @@ VERBATIM_CLAUDE_DIRS = (
 ADVISORY = {
     "Makefile": "templates/standard/Makefile",
     ".pre-commit-config.yaml": "templates/standard/.pre-commit-config.yaml",
+    ".gitleaks.toml": "templates/standard/.gitleaks.toml",
     ".claude/settings.json": "templates/greenfield/.claude/settings.json",
 }
 

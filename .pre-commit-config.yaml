@@ -39,6 +39,15 @@ repos:
     hooks:
       - id: detect-secrets
 
+  # gitleaks' provider rules (GitHub/AWS/1Password tokens, private keys, JWTs)
+  # on staged changes. pre-commit bootstraps the Go toolchain it builds with.
+  # .gitleaks.toml extends the defaults and skips only .secrets.baseline.
+  # (Ported from agentic-skeleton v0.50.0; this repo carries OAuth code.)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.3
+    hooks:
+      - id: gitleaks
+
   # ── Shell-script linting — pip-packaged shellcheck, no system dep ───
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1

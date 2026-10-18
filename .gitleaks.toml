@@ -1,0 +1,10 @@
+# gitleaks runs at pre-commit on staged changes: its default rules, plus one path allowlist.
+# .secrets.baseline holds only SHA-1 hashes of detect-secrets findings, never a secret, but its
+# "hashed_secret" lines match generic-api-key, so every re-baseline would trip gitleaks.
+# detect-secrets audits that file instead.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "detect-secrets baseline: SHA-1 hashes only"
+paths = ['''(^|/)\.secrets\.baseline$''']

@@ -7,13 +7,12 @@
 # Run `make help` for a full list of available targets.
 
 .PHONY: help help-stack install env env-check setup validate update info \
-        regenerate run archive notarize release hooks privacy privacy-init signing-init \
-        dev build start lint typecheck check-architecture check-docs \
+        regenerate archive notarize release hooks privacy privacy-init signing-init \
+        dev build start lint typecheck check-architecture check-docs check-phony \
         check-precommit check-skeleton sync-skeleton check-skills stamp-skill fix test \
         bump-patch bump-minor bump-major check-version-bumped version \
         clean clean-all \
         docker-build docker-run docker-stop docker-clean \
-        db-generate db-push db-migrate db-studio db-reset \
         check-if-the-agent-can-consider-this-task-completed
 
 # ─── Configuration ────────────────────────────────────────────────────
@@ -79,6 +78,7 @@ help:
 	@echo "  $(GREEN)make lint$(RESET)                 Run linter"
 	@echo "  $(GREEN)make typecheck$(RESET)            Run type checker"
 	@echo "  $(GREEN)make check-architecture$(RESET)   Run repo-native architecture checks"
+	@echo "  $(GREEN)make check-phony$(RESET)          Fail on any .PHONY name with no rule"
 	@echo "  $(GREEN)make fix$(RESET)                  Auto-fix lint issues"
 	@echo "  $(GREEN)make test$(RESET)                 Run tests (when testing is enabled)"
 	@echo "  $(GREEN)make validate$(RESET)             Run aggregate validation: lint + typecheck + architecture + version-gate"
@@ -157,7 +157,7 @@ setup: install env typecheck
 	@echo "  Run $(CYAN)make dev$(RESET) to start developing."
 
 ## validate: Run the repo's aggregate validation flow
-validate: privacy lint typecheck check-architecture check-version-bumped check-skills
+validate: privacy lint typecheck check-architecture check-version-bumped check-skills check-phony
 	@echo "$(GREEN)Validation complete.$(RESET)"
 
 # ─── Versioning (non-negotiable: every commit gets a bump) ───────────
@@ -346,6 +346,112 @@ info:
 	@echo "  Tree:    $$(git status --porcelain | wc -l | tr -d ' ') uncommitted changes"
 	@echo "  Port:    $(PORT)"
 
+# ─── Required-files + commit-surface gates ──────────────────────────
+
+## check-docs: Enforce VIBE.yaml docs.*_required (fails closed)
+check-docs:
+	@echo "$(CYAN)Checking required collaboration files (VIBE.yaml docs)...$(RESET)"
+	@if [ ! -f scripts/check_docs.py ]; then \
+		echo "$(RED)  scripts/check_docs.py is MISSING — the docs gate$(RESET)"; \
+		echo "$(RED)  cannot run. Hard failure. Re-run the bootstrap.$(RESET)"; \
+		exit 1; \
+	fi
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run scripts/check_docs.py; \
+	elif python3 -c 'import yaml' >/dev/null 2>&1; then \
+		python3 scripts/check_docs.py; \
+	else \
+		echo "$(RED)  docs gate cannot run: no 'uv', no python3 + PyYAML.$(RESET)"; \
+		exit 1; \
+	fi
+
+## check-precommit: Verify the pre-commit hook is installed (fails closed)
+check-precommit:
+	@echo "$(CYAN)Checking the pre-commit enforcement surface...$(RESET)"
+	@if [ ! -f .pre-commit-config.yaml ]; then \
+		echo "$(RED)  .pre-commit-config.yaml is MISSING — the commit-time$(RESET)"; \
+		echo "$(RED)  enforcement surface is absent. Re-run the bootstrap.$(RESET)"; \
+		exit 1; \
+	fi
+	@if ! command -v pre-commit >/dev/null 2>&1; then \
+		echo "$(RED)  pre-commit is not installed — it is MANDATORY, not$(RESET)"; \
+		echo "$(RED)  optional. Install it: uv tool install pre-commit$(RESET)"; \
+		exit 1; \
+	fi
+	@HOOK=$$(git rev-parse --git-path hooks/pre-commit 2>/dev/null); \
+	if [ -z "$$HOOK" ] || [ ! -f "$$HOOK" ] || ! grep -q pre-commit "$$HOOK" 2>/dev/null; then \
+		echo "$(RED)  the pre-commit git hook is NOT installed. Run:$(RESET)"; \
+		echo "$(RED)    pre-commit install$(RESET)"; \
+		echo "$(RED)  A .pre-commit-config.yaml with no installed hook$(RESET)"; \
+		echo "$(RED)  enforces nothing — fail closed.$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)  pre-commit hook installed.$(RESET)"
+
+## check-phony: Every .PHONY name must have a rule (a deleted gate must fail, not pass)
+check-phony:
+	@python3 scripts/check_phony.py Makefile
+
+## check-skeleton: Report drift vs the installed agentic-skeleton
+check-skeleton:
+	@echo "$(CYAN)Checking skeleton-owned files for drift...$(RESET)"
+	@if [ ! -f scripts/sync_skeleton.py ]; then \
+		echo "$(RED)  scripts/sync_skeleton.py is MISSING — cannot check$(RESET)"; \
+		echo "$(RED)  skeleton drift. Re-run the agentic-skeleton bootstrap.$(RESET)"; \
+		exit 1; \
+	fi
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run scripts/sync_skeleton.py --check; \
+	else \
+		python3 scripts/sync_skeleton.py --check; \
+	fi
+
+## sync-skeleton: Pull current skeleton-owned files into this repo
+sync-skeleton:
+	@if [ ! -f scripts/sync_skeleton.py ]; then \
+		echo "$(RED)  scripts/sync_skeleton.py is MISSING.$(RESET)"; \
+		exit 1; \
+	fi
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run scripts/sync_skeleton.py --apply; \
+	else \
+		python3 scripts/sync_skeleton.py --apply; \
+	fi
+
+## check-skills: Advisory applied-skill provenance + drift report (never fails validate)
+check-skills:
+	@echo "$(CYAN)Checking applied-skill provenance...$(RESET)"
+	@if [ ! -f scripts/check_skills.py ]; then \
+		echo "$(YELLOW)  scripts/check_skills.py not present — run 'make sync-skeleton'.$(RESET)"; \
+	elif command -v uv >/dev/null 2>&1; then \
+		uv run scripts/check_skills.py || true; \
+	else \
+		python3 scripts/check_skills.py || true; \
+	fi
+
+## stamp-skill: Record that a skill was applied (SKILL=<id> [VERSION=x.y.z])
+stamp-skill:
+	@if [ -z "$(SKILL)" ]; then \
+		echo "$(RED)Usage: make stamp-skill SKILL=<id> [VERSION=x.y.z]$(RESET)"; exit 1; \
+	fi
+	@if [ ! -f scripts/stamp_skill.py ]; then \
+		echo "$(RED)  scripts/stamp_skill.py missing — run 'make sync-skeleton'.$(RESET)"; exit 1; \
+	fi
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run scripts/stamp_skill.py "$(SKILL)" $(if $(VERSION),--version "$(VERSION)"); \
+	else \
+		python3 scripts/stamp_skill.py "$(SKILL)" $(if $(VERSION),--version "$(VERSION)"); \
+	fi
+
+# ─── Completion Gate ──────────────────────────────────────────────────
+
+## check-if-the-agent-can-consider-this-task-completed: Final verification gate
+check-if-the-agent-can-consider-this-task-completed: validate check-docs check-precommit test
+
+## help-stack: Show which lang-* skill should fill in stub targets
+help-stack:
+	@echo "$(BOLD)$(CYAN)Stub targets and their owning lang-* skills$(RESET)"
+	@echo ""
 	@echo "Greenfield Makefile targets that print '(stub — overlay a lang-* skill"
 	@echo "to fill this in)' need a stack-specific skill to overlay recipe bodies."
 	@echo "Pick the skill matching VIBE.yaml::project.stack:"
