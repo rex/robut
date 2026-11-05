@@ -30,6 +30,14 @@ version bumps).
 
 ---
 
+## [0.32.0] — 2026-11-05 — Agent: Claude
+### Added
+- Codex project config, written by Codex's importer on 2026-10-24 and
+  uncommitted since: the Claude subagents as Codex agents
+  (`.codex/agents/*.toml`), the scaffold, retrofit and sync-skills
+  commands as Codex skills (`.agents/skills/`), and the sequential-thinking
+  MCP server in `.codex/config.toml`, which the importer also reformatted.
+
 ## [0.31.1] — 2026-10-18 — Agent: Claude Opus 5.5
 ### First public release
 
