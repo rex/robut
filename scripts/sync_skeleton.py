@@ -20,12 +20,18 @@ Modes:
                      absent (commit = push is part of the toolchain).
 
 File classes:
-  VERBATIM  — gate scripts + every file under .claude/{hooks,commands,
-              agents,rules}. Pure skeleton property; copied as-is.
-  ADVISORY  — Makefile, .pre-commit-config.yaml, .claude/settings.json.
-              Skeleton-owned in STRUCTURE but carrying repo-specific
-              content; drift is reported, never blind-copied — reconcile
-              with judgment (see /agentic-checkup).
+  VERBATIM  — gate scripts, make/agentic-skeleton.mk (the shared
+              Makefile core) and every file under .claude/{hooks,
+              commands,agents,rules}. Pure skeleton property; copied
+              as-is, so any local edit is drift.
+  CONTRACT  — Makefile. Repo-owned; checked for STRUCTURE, never bytes
+              (makefile_contract.py): it must plainly include the core,
+              give no skeleton-owned target a second recipe, and define
+              lint / typecheck / test. A violation fails --check.
+  ADVISORY  — .pre-commit-config.yaml, .gitleaks.toml,
+              .claude/settings.json. Skeleton-owned in STRUCTURE but
+              carrying repo-specific content; drift is reported, never
+              blind-copied — reconcile with judgment (/agentic-checkup).
   RETIRED   — files the skeleton has dropped; `--apply` removes them.
   ORPHAN    — any other file in a managed .claude/ dir: reported for
               review, never touched (it may be a repo-local addition).
@@ -63,6 +69,12 @@ VERBATIM_SCRIPTS = (
     "stamp_skill.py", "check_skills.py", "secret_filters.py",
 )
 
+# Verbatim Makefile core: (skeleton path, repo path). The repo-owned
+# Makefile includes it; see makefile_contract.py for the contract.
+VERBATIM_MAKE = (
+    ("templates/standard/make/agentic-skeleton.mk", "make/agentic-skeleton.mk"),
+)
+
 # Verbatim .claude/ directories: every file the skeleton ships in each
 # is skeleton property. greenfield is the canonical source.
 #   (skeleton subdir, repo subdir, glob)
@@ -74,10 +86,9 @@ VERBATIM_CLAUDE_DIRS = (
 )
 
 # Advisory files — skeleton-owned in STRUCTURE but carrying repo-specific
-# content (Makefile recipe bodies, extra pre-commit hooks, repo-specific
-# settings.json permissions). Drift is reported, never blind-copied.
+# content (extra pre-commit hooks, repo-specific settings.json
+# permissions). Drift is reported, never blind-copied.
 ADVISORY = {
-    "Makefile": "templates/standard/Makefile",
     ".pre-commit-config.yaml": "templates/standard/.pre-commit-config.yaml",
     ".gitleaks.toml": "templates/standard/.gitleaks.toml",
     ".claude/settings.json": "templates/greenfield/.claude/settings.json",
@@ -137,6 +148,8 @@ def build_pairs(skeleton: Path, repo: Path) -> list[tuple[Path, Path, str]]:
     for name in VERBATIM_SCRIPTS:
         pairs.append((repo / "scripts" / name,
                       skeleton / "scripts" / name, "verbatim"))
+    for skel_rel, repo_rel in VERBATIM_MAKE:
+        pairs.append((repo / repo_rel, skeleton / skel_rel, "verbatim"))
     for skel_sub, repo_sub, glob in VERBATIM_CLAUDE_DIRS:
         skel_dir = skeleton / skel_sub
         if skel_dir.is_dir():
@@ -176,6 +189,26 @@ def _print_orphans(repo: Path, orphans: list[Path]) -> None:
           f"dir but not skeleton-owned (left untouched, review):{_X}")
     for f in orphans:
         print(f"  • {f.relative_to(repo)}")
+
+
+def _makefile_problems(repo: Path, skeleton: Path) -> list[str]:
+    """Structural Makefile contract, judged by the INSTALLED skeleton's
+    makefile_contract.py (never a repo copy, which could be stale).
+    A workspace (WORKSPACE.yaml, no VIBE.yaml) fans out instead."""
+    if (repo / "WORKSPACE.yaml").is_file() and not (repo / "VIBE.yaml").is_file():
+        return []
+    sys.path.insert(0, str(skeleton / "scripts"))
+    import makefile_contract as mc  # noqa: PLC0415
+    core = skeleton / "templates" / "standard" / mc.SKELETON_MK
+    return mc.check_contract(repo, mc.owned_targets(core.read_text()))
+
+
+def _print_makefile(problems: list[str], color: str) -> None:
+    print(f"{color}✗ Makefile breaks the include contract:{_X}")
+    for p in problems:
+        print(f"  ✗ {p}")
+    print("  Fix by hand, or run the skeleton's scripts/migrate_makefile.py "
+          "(see references/makefile-pattern.md).")
 
 
 def autopush_state(repo: Path, skeleton: Path) -> str:
@@ -274,9 +307,11 @@ def main() -> int:
     retired_present = [repo / r for r in RETIRED if (repo / r).is_file()]
     orphans = find_orphans(repo, pairs)
     autopush = autopush_state(repo, skeleton)
+    mk_problems = _makefile_problems(repo, skeleton)
 
     print(f"sync_skeleton: {repo.name} vs agentic-skeleton v{version}")
     if (not verbatim_drift and not advisory_drift and not retired_present
+            and not mk_problems
             and not (args.apply and autopush == "missing")):
         print(f"{_G}✓ in sync — every skeleton-owned file is current.{_X}")
         if autopush == "missing":
@@ -323,9 +358,10 @@ def main() -> int:
                   f"reconcile by hand, NOT auto-copied:{_X}")
             for repo_path, state in advisory_drift:
                 print(f"    ~ {repo_path.relative_to(repo)} ({state})")
-            print("  Makefile / pre-commit / settings.json carry repo-"
-                  "specific content — porting needs judgment. "
-                  "Run /agentic-checkup.")
+            print("  pre-commit / gitleaks / settings.json carry repo-specific"
+                  " content — porting needs judgment. Run /agentic-checkup.")
+        if mk_problems:
+            _print_makefile(mk_problems, _Y)
         if orphans:
             _print_orphans(repo, orphans)
         print(f"{_G}✓ synced {len(verbatim_drift)} file(s), deleted "
@@ -347,6 +383,8 @@ def main() -> int:
               f"(reconcile by hand):{_X}")
         for repo_path, state in advisory_drift:
             print(f"  ~ {repo_path.relative_to(repo)} ({state})")
+    if mk_problems:
+        _print_makefile(mk_problems, _R)
     if orphans:
         _print_orphans(repo, orphans)
     if autopush == "missing":

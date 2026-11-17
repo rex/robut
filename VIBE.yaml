@@ -163,6 +163,6 @@ privacy:
 # `make check-skills`. Don't hand-edit entries — re-stamp instead.
 skills:
   - id: agentic-skeleton
-    version: "0.50.0"
-    applied: '2026-10-18'
+    version: "0.55.0"
+    applied: '2026-11-17'
     source: sync

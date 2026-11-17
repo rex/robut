@@ -30,6 +30,10 @@ version bumps).
 
 ---
 
+## [0.33.0] — 2026-11-17 — Agent: Claude Opus 5.5
+### Changed
+- Adopt agentic-skeleton 0.55.0's include-based Makefile: the gates live in the skeleton-owned make/agentic-skeleton.mk and the Makefile keeps this repo's own recipes, so make check-skeleton stops failing on them. Verified against make's rule database; repo targets, variables and the default goal are unchanged.
+
 ## [0.32.0] — 2026-11-05 — Agent: Claude
 ### Added
 - Codex project config, written by Codex's importer on 2026-10-24 and

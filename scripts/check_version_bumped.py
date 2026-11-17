@@ -16,9 +16,17 @@ Rules enforced:
   3. CHANGELOG.md has a `## [<NEW_VERSION>] — ` header matching the
      current VERSION.
 
+Lockstep VERSION (lang-swift-apple `references/distribution.md`):
+`MAJOR=<n>` + `MINOR_BASE=<n>` lines, with the marketing minor derived
+from the commit count, so the bump happens on every commit by
+construction. The gate instead requires both fields to be integers and
+the `.githooks/pre-commit` auto-bumper to be active (core.hooksPath =
+.githooks, hook executable). CI checkouts never install hooks, so there
+only the format is checked.
+
 Exit codes:
   0  ok
-  1  version not bumped
+  1  version not bumped / lockstep auto-bumper inactive
   2  changelog missing or mismatched
   3  malformed version
 """
@@ -38,6 +46,7 @@ _G = "\033[32m" if _TTY else ""
 _X = "\033[0m" if _TTY else ""
 
 SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+LOCKSTEP_RE = re.compile(r"^MAJOR=", re.M)
 
 
 def fail(msg: str, code: int) -> None:
@@ -99,12 +108,36 @@ def parent_version() -> str | None:
     return _git_show_version("HEAD~1")
 
 
+def check_lockstep(text: str) -> int:
+    """Lockstep VERSION: integer fields + an active auto-bumper hook."""
+    fields = dict(re.findall(r"^(MAJOR|MINOR_BASE)=\s*(\S*)\s*$", text, re.M))
+    if not all(fields.get(k, "").isdigit() for k in ("MAJOR", "MINOR_BASE")):
+        fail(f"lockstep VERSION needs integer MAJOR= and MINOR_BASE= lines "
+             f"(found {fields})", 3)
+    label = f"lockstep MAJOR={fields['MAJOR']} MINOR_BASE={fields['MINOR_BASE']}"
+    if os.environ.get("CI", "").lower() == "true":
+        print(f"{_G}✓ version-gate:{_X} {label} (CI: hooks are not "
+              "installed, format checked only)")
+        return 0
+    hooks = subprocess.run(["git", "config", "--get", "core.hooksPath"],
+                           capture_output=True, text=True, check=False)
+    hook = Path(".githooks/pre-commit")
+    if hooks.stdout.strip() != ".githooks" or not os.access(hook, os.X_OK):
+        fail(f"{label}, but the .githooks/pre-commit auto-bumper is not "
+             "active. Run: git config core.hooksPath .githooks", 1)
+    print(f"{_G}✓ version-gate:{_X} {label}; .githooks/pre-commit "
+          "auto-bumper active")
+    return 0
+
+
 def main() -> int:
     version_file = Path("VERSION")
     if not version_file.is_file():
         fail("VERSION file missing at repo root. Run: scripts/bump_version.py patch", 1)
 
     current = version_file.read_text().strip()
+    if LOCKSTEP_RE.search(current):
+        return check_lockstep(current)
     if not SEMVER_RE.match(current):
         fail(f"VERSION is not semver: '{current}'", 3)
 

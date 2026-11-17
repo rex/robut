@@ -55,10 +55,17 @@ except Exception:
 }
 
 # --- Check 1: Standing "continue-until-blocked" directive ---
+# HTML comments are template guidance, not directives: the template's own
+# example text says "Continue until blocked". And a TASK_STATE.md with no
+# local slice Status lines (work tracked elsewhere, e.g. Rivendell) has no
+# slice to resume, so the check applies only where slices are tracked here.
 if [ -f TASK_STATE.md ]; then
-  if grep -qiE 'continue.until.blocked|do not stop|continue iterating' TASK_STATE.md; then
+  STATE=$(python3 -c 'import re; print(re.sub(r"<!--.*?-->", "", open("TASK_STATE.md", encoding="utf-8").read(), flags=re.S))' 2>/dev/null) \
+    || STATE=$(cat TASK_STATE.md)
+  if grep -qiE 'continue.until.blocked|do not stop|continue iterating' <<<"$STATE" \
+     && grep -qE '^[[:space:]]*(-[[:space:]]*)?Status:' <<<"$STATE"; then
     # Check if current slice is done or blocked
-    if ! grep -qE '(✅ done|🔴 blocked|Status: done|Status: blocked)' TASK_STATE.md; then
+    if ! grep -qE '(✅ done|🔴 blocked|Status: done|Status: blocked)' <<<"$STATE"; then
       jq -n '{
         decision: "block",
         reason: "TASK_STATE.md has a standing continue-until-blocked directive and no slice is marked done/blocked. Resume the next slice instead of stopping."
